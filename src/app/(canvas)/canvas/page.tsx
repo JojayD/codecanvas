@@ -2,12 +2,9 @@
 import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import CodeEditor from "@/app/(canvas)/components/CodeEditor";
-import { SplitPane } from '@rexxars/react-split-pane';
-
-const splitPaneStyles = {
-    height: '100%',
-    position: 'relative' as const,
-};
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import WhiteBoard from "@/app/(canvas)/components/WhiteBoard";
+import Prompt from "@/app/(canvas)/components/Prompt";
 
 const Canvas = () => {
     const params = useParams();
@@ -20,25 +17,29 @@ const Canvas = () => {
 
     return (
         <div className="h-[calc(100vh-120px)] w-full">
-            <SplitPane
-                split="vertical"
-                minSize={200}
-                defaultSize={750}
-                style={splitPaneStyles}
-                pane1Style={{ overflow: 'auto' }}
-                pane2Style={{ overflow: 'auto' }}
-            >
-                <CodeEditor
-                    language={language}
-                    defaultValue="// Start coding here"
-                    documentId={documentId}
-                    disableAutocomplete={true}
-                    onLanguageChange={handleLanguageChange}
-                />
-                <div className="bg-gray-100 h-full p-4">
-                    <h3>Output</h3>
-                </div>
-            </SplitPane>
+            <PanelGroup direction="horizontal">
+                <Panel defaultSize={20} minSize={10}>
+                    <Prompt/>
+                </Panel>
+                <PanelResizeHandle className="w-1.5 bg-gray-300 hover:bg-blue-500 transition-colors cursor-col-resize" />
+
+                <Panel defaultSize={60} minSize={20}>
+                    <CodeEditor
+                        language={language}
+                        defaultValue="// Start coding here"
+                        documentId={documentId}
+                        disableAutocomplete={true}
+                        onLanguageChange={handleLanguageChange}
+                    />
+                </Panel>
+
+                <PanelResizeHandle className="w-1.5 bg-gray-300 hover:bg-blue-500 transition-colors cursor-col-resize" />
+
+                <Panel defaultSize={40} minSize={20}>
+                    <WhiteBoard/>
+                </Panel>
+
+            </PanelGroup>
         </div>
     );
 };

@@ -14,7 +14,7 @@ export default function Home() {
             const { data: { session } } = await supabase.auth.getSession();
             console.log(session);
             if (session) {
-                router.push('/canvas');
+                router.push('/dashboard');
             }
             setIsLoading(false);
         };

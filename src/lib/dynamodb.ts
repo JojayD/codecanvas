@@ -35,3 +35,16 @@ export const getCodeDocument = async (documentId: string) => {
 
   return await docClient.send(command);
 };
+
+export const savePrompt = async (documentId: string, prompt: string) => {
+  const command = new PutCommand({
+    TableName: "Prompts",
+    Item: {
+      documentId,
+      prompt,
+      lastUpdated: new Date().toISOString(),
+    },
+  });
+
+  return await docClient.send(command);
+}
