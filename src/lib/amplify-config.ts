@@ -14,7 +14,8 @@
 // });
 //
 // export default config;
-import { Amplify } from "aws-amplify"
-import outputs from "../amplify_outputs.json"
+import { Amplify } from "aws-amplify";
 
-Amplify.configure(outputs)
+// Use the configuration from src/app/utils/amplify-config.js instead
+// as it already correctly imports and configures Amplify
+export { configureAmplify } from "../app/utils/amplify-config.js";

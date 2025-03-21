@@ -1,0 +1,115 @@
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+type CodeEditorDocuments {
+  documentId: String!
+}
+
+type CodeEditorDocumentsConnection {
+  items: [CodeEditorDocuments]
+  nextToken: String
+}
+
+type Mutation {
+  createCodeEditorDocuments(input: CreateCodeEditorDocumentsInput!): CodeEditorDocuments
+  deleteCodeEditorDocuments(input: DeleteCodeEditorDocumentsInput!): CodeEditorDocuments
+  updateCodeEditorDocuments(input: UpdateCodeEditorDocumentsInput!): CodeEditorDocuments
+}
+
+type Query {
+  getCodeEditorDocuments(documentId: String!): CodeEditorDocuments
+  listCodeEditorDocuments(filter: TableCodeEditorDocumentsFilterInput, limit: Int, nextToken: String): CodeEditorDocumentsConnection
+}
+
+type Subscription {
+  onCreateCodeEditorDocuments(documentId: String): CodeEditorDocuments @aws_subscribe(mutations : ["createCodeEditorDocuments"])
+  onDeleteCodeEditorDocuments(documentId: String): CodeEditorDocuments @aws_subscribe(mutations : ["deleteCodeEditorDocuments"])
+  onUpdateCodeEditorDocuments(documentId: String): CodeEditorDocuments @aws_subscribe(mutations : ["updateCodeEditorDocuments"])
+}
+
+input CreateCodeEditorDocumentsInput {
+  documentId: String!
+}
+
+input DeleteCodeEditorDocumentsInput {
+  documentId: String!
+}
+
+input ModelSizeInput {
+  between: [Int]
+  eq: Int
+  ge: Int
+  gt: Int
+  le: Int
+  lt: Int
+  ne: Int
+}
+
+input TableBooleanFilterInput {
+  attributeExists: Boolean
+  eq: Boolean
+  ne: Boolean
+}
+
+input TableCodeEditorDocumentsFilterInput {
+  documentId: TableStringFilterInput
+}
+
+input TableFloatFilterInput {
+  attributeExists: Boolean
+  between: [Float]
+  eq: Float
+  ge: Float
+  gt: Float
+  le: Float
+  lt: Float
+  ne: Float
+}
+
+input TableIDFilterInput {
+  attributeExists: Boolean
+  beginsWith: ID
+  between: [ID]
+  contains: ID
+  eq: ID
+  ge: ID
+  gt: ID
+  le: ID
+  lt: ID
+  ne: ID
+  notContains: ID
+  size: ModelSizeInput
+}
+
+input TableIntFilterInput {
+  attributeExists: Boolean
+  between: [Int]
+  eq: Int
+  ge: Int
+  gt: Int
+  le: Int
+  lt: Int
+  ne: Int
+}
+
+input TableStringFilterInput {
+  attributeExists: Boolean
+  beginsWith: String
+  between: [String]
+  contains: String
+  eq: String
+  ge: String
+  gt: String
+  le: String
+  lt: String
+  ne: String
+  notContains: String
+  size: ModelSizeInput
+}
+
+input UpdateCodeEditorDocumentsInput {
+  documentId: String!
+}
