@@ -4,9 +4,15 @@ import Image from "next/image";
 
 export default function GoogleLoginButton() {
 	const signInWithGoogle = async () => {
-		const { error } = await supabase.auth.signInWithOAuth({ provider: "google" });
-		if (error) {
-			console.error("Error signing in:", error.message);
+		try {
+			const { error } = await supabase.auth.signInWithOAuth({
+				provider: "google",
+			});
+			if (error) {
+				console.error("Error signing in:", error.message);
+			}
+		} catch (err) {
+			console.error("Google sign-in error:", err);
 		}
 	};
 

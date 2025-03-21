@@ -12,26 +12,35 @@ export default function Home() {
 	useEffect(() => {
 		// Check current auth status when component mounts
 		const checkUser = async () => {
-			const {
-				data: { session },
-			} = await supabase.auth.getSession();
-			console.log(session);
-			if (session) {
-				router.push("/dashboard");
+			try {
+				const {
+					data: { session },
+				} = await supabase.auth.getSession();
+
+				if (session) {
+					router.push("/dashboard");
+				}
+			} catch (error) {
+				console.error("Auth check error:", error);
+			} finally {
+				setIsLoading(false);
 			}
-			setIsLoading(false);
 		};
 
 		checkUser();
 
 		// Subscribe to auth changes
-		const {
-			data: { subscription },
-		} = supabase.auth.onAuthStateChange((event, session) => {
-			if (event === "SIGNED_IN" && session) {
-				router.push("/canvas");
-			}
-		});
+		let subscription = { unsubscribe: () => {} };
+		try {
+			const { data } = supabase.auth.onAuthStateChange((event, session) => {
+				if (event === "SIGNED_IN" && session) {
+					router.push("/canvas");
+				}
+			});
+			if (data) subscription = data.subscription;
+		} catch (error) {
+			console.error("Auth subscription error:", error);
+		}
 
 		// Cleanup subscription on unmount
 		return () => {
