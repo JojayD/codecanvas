@@ -1,19 +1,33 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { RoomProvider, useRoom } from "@/app/context/RoomContextProivider";
 import { SplitPane } from "@rexxars/react-split-pane";
 import dynamic from "next/dynamic";
 import Prompt from "../components/Prompt";
-import WhiteBoard from "../components/WhiteBoard";
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import React from "react";
 
 // Dynamically import the CodeEditor component to avoid SSR issues
 const DynamicCodeEditor = dynamic(
 	() => import("@/app/(canvas)/components/CodeEditor"),
 	{
 		ssr: false,
+	}
+);
+
+// Import WhiteBoard with the correct Next.js dynamic import pattern
+// This fixes the 'canvas' module not found error (GitHub issue #102)
+const DynamicWhiteBoard = dynamic(
+	() => import("@/app/(canvas)/components/WhiteBoard"),
+	{
+		ssr: false,
+		loading: () => (
+			<div className='h-full w-full flex items-center justify-center'>
+				Loading whiteboard...
+			</div>
+		),
 	}
 );
 
@@ -33,6 +47,62 @@ function Canvas() {
 
 	// Add debug state
 	const [showDebug, setShowDebug] = useState(false);
+
+	// Add state for update notifications
+	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+	const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+
+	// Track previous participants to detect changes
+	const prevParticipantsRef = React.useRef<string[]>([]);
+
+	// Handle real-time updates
+	useEffect(() => {
+		// Convert participants to strings for comparison
+		const currentParticipantIds = participants.map((p) => p.userId);
+		const prevParticipantIds = prevParticipantsRef.current;
+
+		// Skip on first render
+		if (prevParticipantIds.length > 0) {
+			// Check if the participants have changed
+			const hasNewParticipants = currentParticipantIds.some(
+				(id) => !prevParticipantIds.includes(id)
+			);
+			const hasLostParticipants = prevParticipantIds.some(
+				(id) => !currentParticipantIds.includes(id)
+			);
+
+			if (hasNewParticipants || hasLostParticipants) {
+				// Someone joined or left
+				setLastUpdate(`Participants updated at ${new Date().toLocaleTimeString()}`);
+				setShowUpdateNotification(true);
+
+				// Hide notification after 3 seconds
+				setTimeout(() => {
+					setShowUpdateNotification(false);
+				}, 3000);
+			}
+		}
+
+		// Update the ref with current participants
+		prevParticipantsRef.current = currentParticipantIds;
+	}, [participants]);
+
+	// Handle code updates
+	useEffect(() => {
+		// Skip on first render (useRef would be cleaner but this works too)
+		if (lastUpdate !== null) {
+			setLastUpdate(`Code updated at ${new Date().toLocaleTimeString()}`);
+			// setShowUpdateNotification(true);
+
+			// Hide notification after 3 seconds
+			// setTimeout(() => {
+			// setShowUpdateNotification(false);
+			// }, 3000);
+			// } else {
+			// Initialize on first render
+			setLastUpdate(`Session started at ${new Date().toLocaleTimeString()}`);
+		}
+	}, [code]);
 
 	// Force join the room when component mounts
 	useEffect(() => {
@@ -236,6 +306,24 @@ function Canvas() {
 				</div>
 			</div>
 
+			{/* Real-time update notification */}
+			{showUpdateNotification && (
+				<div className='bg-blue-500 text-white px-4 py-2 text-sm transition-opacity duration-300 flex justify-between items-center'>
+					<span>{lastUpdate}</span>
+					<button
+						className='text-white hover:text-gray-200'
+						onClick={() => setShowUpdateNotification(false)}
+					>
+						✕
+					</button>
+				</div>
+			)}
+
+			{/* Last update timestamp (always visible) */}
+			<div className='bg-gray-700 text-gray-300 px-4 py-1 text-xs'>
+				{lastUpdate || "Connecting..."}
+			</div>
+
 			{showDebug && (
 				<div className='bg-gray-900 text-white p-2 max-h-40 overflow-auto'>
 					<h3 className='font-bold'>Debug Information:</h3>
@@ -289,11 +377,12 @@ function Canvas() {
 						<div className='h-full overflow-hidden'>
 							<DynamicCodeEditor
 								defaultValue={code}
+								key={`editor-${roomId}`}
 								onChange={(value) => updateCode(value || "")}
 							/>
 						</div>
 						<div className='h-full overflow-hidden'>
-							<WhiteBoard />
+							<DynamicWhiteBoard />
 						</div>
 					</SplitPane>
 				</SplitPane>
@@ -302,7 +391,8 @@ function Canvas() {
 	);
 }
 
-export default function CanvasPage() {
+// Component to handle room ID extraction and provide it to RoomProvider
+function CanvasWithParams() {
 	const searchParams = useSearchParams();
 	const roomId = searchParams.get("roomId");
 
@@ -328,5 +418,14 @@ export default function CanvasPage() {
 				<Canvas />
 			</RoomProvider>
 		</div>
+	);
+}
+
+// Main page component with Suspense boundary for useSearchParams
+export default function CanvasPage() {
+	return (
+		<Suspense fallback={<div className='p-4 text-center'>Loading...</div>}>
+			<CanvasWithParams />
+		</Suspense>
 	);
 }

@@ -14,31 +14,24 @@ import {
 	updateRoom,
 	subscribeToRoom,
 	subscribeToCodeChanges,
+	subscribeToPromptChanges,
 } from "@/lib/supabaseRooms";
-import { Room as SupabaseRoom } from "@/lib/supabase";
+import { Room, Room as SupabaseRoom } from "@/lib/supabase";
 
 type Participant = { userId: string; username: string };
 type RoomContextType = {
 	roomId: string;
 	participants: Participant[];
 	code: string;
+	prompt: string;
 	updateCode: (newCode: string) => Promise<void>;
+	updatePrompt: (newPrompt: string) => Promise<void>;
 	joinRoom: () => Promise<void>;
 	leaveRoom: () => Promise<void>;
 	loading: boolean;
 	error: Error | null;
 	currentUser: { userId: string; username: string };
 };
-
-interface Room {
-	id: string;
-	name: string;
-	description: string;
-	code: string;
-	created_at: string;
-	updated_at: string;
-	participants: string[];
-}
 
 const RoomContext = createContext<RoomContextType | null>(null);
 
@@ -59,6 +52,7 @@ export const RoomProvider: React.FC<{
 
 	const [room, setRoom] = useState<Room | null>(null);
 	const [code, setCode] = useState<string>("");
+	const [prompt, setPrompt] = useState<string>("");
 	const [participants, setParticipants] = useState<Participant[]>([]);
 	const [loading, setLoading] = useState<boolean>(true);
 	const [error, setError] = useState<Error | null>(null);
@@ -95,6 +89,7 @@ export const RoomProvider: React.FC<{
 					console.log("Room data received:", roomData);
 					setRoom(roomData);
 					setCode(roomData.code || "// Start coding here...");
+					setPrompt(roomData.prompt || "");
 
 					// Ensure participants is an array
 					const participantsList = Array.isArray(roomData.participants)
@@ -141,8 +136,13 @@ export const RoomProvider: React.FC<{
 
 		console.log("Setting up real-time subscriptions for room:", roomIdFromParams);
 
-		// Subscribe to room updates (participants)
-		const roomSubscription = subscribeToRoom(roomIdFromParams, (updatedRoom) => {
+		// Create refs to hold the subscription objects
+		let roomSubscription: { unsubscribe: () => void } | null = null;
+		let codeSubscription: { unsubscribe: () => void } | null = null;
+		let promptSubscription: { unsubscribe: () => void } | null = null;
+
+		// Set up the room subscription
+		subscribeToRoom(roomIdFromParams, (updatedRoom) => {
 			console.log("Room update received:", updatedRoom);
 			setRoom(updatedRoom);
 
@@ -161,22 +161,108 @@ export const RoomProvider: React.FC<{
 			});
 
 			setParticipants(parsedParticipants);
-		});
+		})
+			.then((subscription) => {
+				roomSubscription = subscription;
+			})
+			.catch((error) => {
+				console.error("Failed to setup room subscription:", error);
+			});
 
-		// Subscribe to code changes
-		const codeSubscription = subscribeToCodeChanges(
-			roomIdFromParams,
-			(updatedCode) => {
-				console.log("Code update received, length:", updatedCode?.length || 0);
-				setCode(updatedCode || "");
+		// Set up the code subscription
+		subscribeToCodeChanges(roomIdFromParams, (updatedCode) => {
+			console.log("Code update received from Supabase:", {
+				length: updatedCode?.length || 0,
+				firstChars: updatedCode?.substring(0, 20),
+				lastUpdate: new Date().toISOString(),
+			});
+
+			// Force a complete state update for the code
+			if (typeof updatedCode === "string") {
+				setCode((prev) => {
+					if (prev !== updatedCode) {
+						console.log("Updating code state with new value");
+						return updatedCode;
+					}
+					return prev;
+				});
 			}
-		);
+		})
+			.then((subscription) => {
+				codeSubscription = subscription;
+			})
+			.catch((error) => {
+				console.error("Failed to setup code subscription:", error);
+			});
+
+		// Set up the prompt subscription
+		subscribeToPromptChanges(roomIdFromParams, (updatedPrompt) => {
+			console.log("Prompt update received from Supabase:", {
+				length: updatedPrompt?.length || 0,
+				firstChars: updatedPrompt?.substring(0, 20),
+				lastUpdate: new Date().toISOString(),
+			});
+
+			// Force a complete state update for the prompt
+			if (typeof updatedPrompt === "string") {
+				setPrompt((prev) => {
+					if (prev !== updatedPrompt) {
+						console.log("Updating prompt state with new value");
+						return updatedPrompt;
+					}
+					return prev;
+				});
+			}
+		})
+			.then((subscription) => {
+				promptSubscription = subscription;
+			})
+			.catch((error) => {
+				console.error("Failed to setup prompt subscription:", error);
+			});
+
+		// Set up polling as a fallback for real-time updates
+		// This will refresh room data every 5 seconds in case real-time updates fail
+		const pollingInterval = setInterval(async () => {
+			try {
+				console.log("Polling for room updates...");
+				const roomData = await getRoom(roomIdFromParams);
+
+				if (roomData) {
+					// Only update if we got valid data
+					console.log("Room data refreshed through polling");
+					setRoom(roomData);
+
+					// Ensure participants is an array
+					const participantsList = Array.isArray(roomData.participants)
+						? roomData.participants
+						: [];
+
+					// Parse participants
+					const parsedParticipants = participantsList.map((p) => {
+						const parts = p.split(":");
+						return {
+							userId: parts[0] || "",
+							username: parts[1] || "Unknown",
+						};
+					});
+
+					setParticipants(parsedParticipants);
+					setCode(roomData.code || "");
+					setPrompt(roomData.prompt || "");
+				}
+			} catch (error) {
+				console.error("Error polling for room updates:", error);
+			}
+		}, 5000); // Poll every 5 seconds
 
 		return () => {
-			// Clean up subscriptions
-			console.log("Cleaning up subscriptions");
-			roomSubscription.unsubscribe();
-			codeSubscription.unsubscribe();
+			// Clean up subscriptions and polling
+			console.log("Cleaning up subscriptions and polling");
+			if (roomSubscription) roomSubscription.unsubscribe();
+			if (codeSubscription) codeSubscription.unsubscribe();
+			if (promptSubscription) promptSubscription.unsubscribe();
+			clearInterval(pollingInterval);
 		};
 	}, [roomIdFromParams]);
 
@@ -230,14 +316,48 @@ export const RoomProvider: React.FC<{
 	const updateCode = useCallback(
 		async (newCode: string) => {
 			try {
+				// Set the local state immediately for a responsive UI
 				setCode(newCode);
+				console.log("Sending code update to Supabase:", {
+					length: newCode.length,
+					firstChars: newCode.substring(0, 20),
+				});
 
 				// Update the code in Supabase
-				await updateRoom(roomIdFromParams, { code: newCode });
+				const result = await updateRoom(roomIdFromParams, { code: newCode });
+				if (!result) {
+					console.error("Failed to update code in Supabase");
+				}
 			} catch (error) {
 				console.error("Error updating code:", error);
 				setError(
 					error instanceof Error ? error : new Error("Failed to update code")
+				);
+			}
+		},
+		[roomIdFromParams]
+	);
+
+	// Update prompt function - memoized with useCallback
+	const updatePrompt = useCallback(
+		async (newPrompt: string) => {
+			try {
+				// Set the local state immediately for a responsive UI
+				setPrompt(newPrompt);
+				console.log("Sending prompt update to Supabase:", {
+					length: newPrompt.length,
+					firstChars: newPrompt.substring(0, 20),
+				});
+
+				// Update the prompt in Supabase
+				const result = await updateRoom(roomIdFromParams, { prompt: newPrompt });
+				if (!result) {
+					console.error("Failed to update prompt in Supabase");
+				}
+			} catch (error) {
+				console.error("Error updating prompt:", error);
+				setError(
+					error instanceof Error ? error : new Error("Failed to update prompt")
 				);
 			}
 		},
@@ -270,7 +390,9 @@ export const RoomProvider: React.FC<{
 				roomId: roomIdFromParams,
 				participants,
 				code,
+				prompt,
 				updateCode,
+				updatePrompt,
 				joinRoom,
 				leaveRoom,
 				loading,

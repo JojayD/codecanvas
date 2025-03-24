@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createRoom } from "@/lib/supabaseRooms";
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { getUserName } from "@/app/utils/supabase/lib/supabaseGetUserName";
+import { getUserId } from "@/app/utils/supabase/lib/supabaseGetUserId";
 
 export default function Dashboard() {
 	const router = useRouter();
@@ -18,12 +20,17 @@ export default function Dashboard() {
 			setLoading(true);
 			setError("");
 
+			const userName = await getUserName();
+			const userId = await getUserId();
+
 			const roomData = {
-				name: "New Room",
+				name: userName || "New Room",
 				description: "A new collaborative coding room",
 				code: "// Start coding here...",
 				participants: [],
 				prompt: "",
+				created_at: new Date().toISOString(),
+				created_by: userId || undefined,
 			};
 
 			console.log("Creating room with data:", roomData);

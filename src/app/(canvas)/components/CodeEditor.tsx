@@ -1,7 +1,7 @@
 "use client";
 
 import MonacoEditor from "@monaco-editor/react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import ChoiceEditor from "@/app/(canvas)/components/ChoiceEditor";
 import { debounce } from "lodash";
 import { v4 as uuidv4 } from "uuid";
@@ -36,6 +36,20 @@ const CodeEditor = ({
 	const [saveStatus, setSaveStatus] = useState<
 		"idle" | "saving" | "saved" | "error"
 	>("idle");
+
+	// Flag to track if edit is local or remote
+	const isLocalChange = useRef(true);
+
+	// Update code when defaultValue changes (for real-time updates)
+	useEffect(() => {
+		// Only update if the new value is different from current state
+		// and it's not a result of a local change
+		if (defaultValue !== code) {
+			console.log("Received external code update, updating editor");
+			isLocalChange.current = false; // Mark this as an external change
+			setCode(defaultValue);
+		}
+	}, [defaultValue]);
 
 	useEffect(() => {
 		const initAuth = async () => {
@@ -169,13 +183,20 @@ const CodeEditor = ({
 
 	const handleEditorChange = (value: string | undefined) => {
 		const newValue = value || "";
-		setCode(newValue);
-		if (onChange) onChange(newValue);
 
-		// Only save if we have a valid session
-		if (session?.access_token) {
-			setSaveStatus("idle"); // Reset status before initiating new save
-			saveDocument(newValue, currentLang);
+		// Only trigger onChange if this is a local change, not from props
+		if (isLocalChange.current) {
+			setCode(newValue);
+			if (onChange) onChange(newValue);
+
+			// Only save if we have a valid session
+			if (session?.access_token) {
+				setSaveStatus("idle"); // Reset status before initiating new save
+				saveDocument(newValue, currentLang);
+			}
+		} else {
+			// Reset the flag after handling an external update
+			isLocalChange.current = true;
 		}
 	};
 
@@ -242,10 +263,10 @@ const CodeEditor = ({
 						scrollBeyondLastLine: false,
 						fontSize: 14,
 						automaticLayout: true,
-						quickSuggestions: !disableAutocomplete,
-						suggestOnTriggerCharacters: !disableAutocomplete,
+						quickSuggestions: false,
+						suggestOnTriggerCharacters: false,
 						parameterHints: {
-							enabled: !disableAutocomplete,
+							enabled: false, // Disable parameter hints
 						},
 					}}
 				/>

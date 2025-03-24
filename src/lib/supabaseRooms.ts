@@ -4,6 +4,7 @@ import {
 	CreateRoomPayload,
 	UpdateRoomPayload,
 } from "./supabase";
+import { createWhiteboard } from "./supabaseWhiteboard";
 
 /**
  * Create a new room
@@ -25,6 +26,23 @@ export async function createRoom(
 			.single();
 
 		if (error) throw error;
+
+		// Create a whiteboard for this room
+		if (data) {
+			try {
+				console.log(`Creating whiteboard for room ${data.id}`);
+				const whiteboard = await createWhiteboard(data.id, roomData.created_by);
+				if (!whiteboard) {
+					console.warn(`Failed to create whiteboard for room ${data.id}`);
+				} else {
+					console.log(`Whiteboard created successfully for room ${data.id}`);
+				}
+			} catch (whiteboardError) {
+				console.error("Error creating whiteboard:", whiteboardError);
+				// We don't throw here as the room was still created successfully
+			}
+		}
+
 		return data;
 	} catch (error) {
 		console.error("Error creating room:", error);
@@ -192,22 +210,50 @@ export function subscribeToRoom(
 	callback: (room: Room) => void
 ) {
 	console.log(`Setting up subscription for room ${roomId}`);
-	return supabase
-		.channel(`room:${roomId}`)
-		.on(
-			"postgres_changes",
-			{
-				event: "UPDATE",
-				schema: "public",
-				table: "rooms", // Make sure this matches your table name exactly
-				filter: `id=eq.${roomId}`,
-			},
-			(payload: any) => {
-				console.log("Room update received:", payload);
-				callback(payload.new as Room);
+
+	// First get the room to determine the actual ID to use in filters
+	return getRoom(roomId)
+		.then((room) => {
+			if (!room) {
+				console.error(`Cannot subscribe - room not found with ID: ${roomId}`);
+				return {
+					unsubscribe: () => console.log("No subscription to unsubscribe from"),
+				};
 			}
-		)
-		.subscribe();
+
+			const actualId = room.id;
+			console.log(`Starting real-time subscription for room ID: ${actualId}`);
+
+			return supabase
+				.channel(`room-changes:${actualId}`)
+				.on(
+					"postgres_changes",
+					{
+						event: "*", // Listen for all events (INSERT, UPDATE, DELETE)
+						schema: "public",
+						table: "rooms",
+						filter: `id=eq.${actualId}`,
+					},
+					(payload: any) => {
+						console.log(`Room event received (${payload.eventType}):`, payload);
+						if (payload.eventType === "DELETE") {
+							console.log("Room was deleted");
+							return; // Handle deletion if needed
+						}
+						callback(payload.new as Room);
+					}
+				)
+				.subscribe((status: { event: string; status: string }) => {
+					console.log(`Subscription status for room ${actualId}:`, status);
+				});
+		})
+		.catch((err) => {
+			console.error("Error setting up room subscription:", err);
+			return {
+				unsubscribe: () =>
+					console.log("Error subscription - nothing to unsubscribe"),
+			};
+		});
 }
 
 /**
@@ -218,21 +264,111 @@ export function subscribeToCodeChanges(
 	callback: (code: string) => void
 ) {
 	console.log(`Setting up code subscription for room ${roomId}`);
-	return supabase
-		.channel(`room-code:${roomId}`)
-		.on(
-			"postgres_changes",
-			{
-				event: "UPDATE",
-				schema: "public",
-				table: "rooms", // Make sure this matches your table name exactly
-				filter: `id=eq.${roomId}`,
-			},
-			(payload: any) => {
-				console.log("Code update received:", payload);
-				const room = payload.new as Room;
-				callback(room.code);
+
+	// First get the room to determine the actual ID to use in filters
+	return getRoom(roomId)
+		.then((room) => {
+			if (!room) {
+				console.error(
+					`Cannot subscribe to code - room not found with ID: ${roomId}`
+				);
+				return {
+					unsubscribe: () => console.log("No code subscription to unsubscribe from"),
+				};
 			}
-		)
-		.subscribe();
+
+			const actualId = room.id;
+			console.log(`Starting real-time code subscription for room ID: ${actualId}`);
+
+			return supabase
+				.channel(`room-code-changes:${actualId}`)
+				.on(
+					"postgres_changes",
+					{
+						event: "UPDATE", // Only interested in updates for code
+						schema: "public",
+						table: "rooms",
+						filter: `id=eq.${actualId}`,
+					},
+					(payload: any) => {
+						console.log("Code update received, payload:", payload);
+						if (!payload.new) {
+							console.error("Invalid payload received for code update");
+							return;
+						}
+						const room = payload.new as Room;
+						callback(room.code || "");
+					}
+				)
+				.subscribe((status: { event: string; status: string }) => {
+					console.log(`Code subscription status for room ${actualId}:`, status);
+				});
+		})
+		.catch((err) => {
+			console.error("Error setting up code subscription:", err);
+			return {
+				unsubscribe: () =>
+					console.log("Error code subscription - nothing to unsubscribe"),
+			};
+		});
+}
+
+/**
+ * Subscribe to prompt changes
+ */
+export function subscribeToPromptChanges(
+	roomId: string,
+	callback: (prompt: string) => void
+) {
+	console.log(`Setting up prompt subscription for room ${roomId}`);
+
+	// First get the room to determine the actual ID to use in filters
+	return getRoom(roomId)
+		.then((room) => {
+			if (!room) {
+				console.error(
+					`Cannot subscribe to prompt - room not found with ID: ${roomId}`
+				);
+				return {
+					unsubscribe: () =>
+						console.log("No prompt subscription to unsubscribe from"),
+				};
+			}
+
+			const actualId = room.id;
+			console.log(
+				`Starting real-time prompt subscription for room ID: ${actualId}`
+			);
+
+			return supabase
+				.channel(`room-prompt-changes:${actualId}`)
+				.on(
+					"postgres_changes",
+					{
+						event: "*", // Listen for all event types for prompt
+						schema: "public",
+						table: "rooms",
+						filter: `id=eq.${actualId}`,
+					},
+					(payload: any) => {
+						console.log("Prompt update received, payload:", payload);
+						if (!payload.new) {
+							console.error("Invalid payload received for prompt update");
+							return;
+						}
+						const room = payload.new as Room;
+						callback(room.prompt || "");
+					}
+				)
+				.subscribe((status: { event: string; status: string }) => {
+					console.log(`Prompt subscription status for room ${actualId}:`, status);
+				});
+		})
+		.catch((err) => {
+			console.error("Error setting up prompt subscription:", err);
+			return {
+				unsubscribe: () =>
+					console.log("Error prompt subscription - nothing to unsubscribe"),
+			};
+		});
 }
