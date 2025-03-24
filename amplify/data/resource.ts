@@ -1,4 +1,6 @@
-import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
+
+console.log("DEBUG: Loading amplify/data/resource.ts");
 
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
@@ -7,20 +9,36 @@ specifies that any unauthenticated user can "create", "read", "update",
 and "delete" any "Todo" records.
 =========================================================================*/
 const schema = a.schema({
-  Todo: a
-    .model({
-      content: a.string(),
-    })
-    .authorization((allow) => [allow.guest()]),
+	Room: a
+		.model({
+			id: a.string().required(),
+			name: a.string().required(),
+			description: a.string().required(),
+			code: a.string().required(),
+			createdAt: a.datetime().required(),
+			updatedAt: a.datetime().required(),
+			participants: a.string().array().required(),
+		})
+		.authorization((allow) => [allow.guest()]),
+
+	// Add a Document model to match what might be expected by the API
+	Document: a
+		.model({
+			documentId: a.string().required(),
+			content: a.string().required(),
+		})
+		.authorization((allow) => [allow.guest()]),
 });
+
+console.log("DEBUG: Schema defined with models:", Object.keys(schema.models));
 
 export type Schema = ClientSchema<typeof schema>;
 
 export const data = defineData({
-  schema,
-  authorizationModes: {
-    defaultAuthorizationMode: 'iam',
-  },
+	schema,
+	authorizationModes: {
+		defaultAuthorizationMode: "iam",
+	},
 });
 
 /*== STEP 2 ===============================================================

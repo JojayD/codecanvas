@@ -1,179 +1,278 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
-                import { generateClient } from '@aws-amplify/api';
-// Define types for your GraphQL operations
-interface Room {
-  id: string;
-  code: string;
-  updatedAt: string;
-  participants?: string[];
-}
+import React, { useState } from "react";
+import { generateClient } from "aws-amplify/api";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import {
+	createRoomMutation,
+	getRoomQuery,
+} from "../../api/graphql/GraphQlFunctions";
+import { GraphQLResult } from "@aws-amplify/api";
 
-interface GetRoomQuery {
-  getRoom: Room | null;
-}
-
-interface CreateRoomMutation {
-  createRoom: Room;
-}
-
-interface UpdateRoomMutation {
-  updateRoom: Room;
-}
-
-interface OnRoomUpdatedSubscription {
-  onRoomUpdated: Room;
-}
-
-// GraphQL operations
-const getRoomQuery = /* GraphQL */ `
-  query GetRoom($id: ID!) {
-    getRoom(id: $id) {
-      id
-      code
-      updatedAt
-      participants
-    }
-  }
-`;
-
-const createRoomMutation = /* GraphQL */ `
-  mutation CreateRoom($id: ID!, $code: String, $participants: [String]) {
-    createRoom(id: $id, code: $code, participants: $participants) {
-      id
-      code
-      updatedAt
-      participants
-    }
-  }
-`;
-
-const updateRoomMutation = /* GraphQL */ `
-  mutation UpdateRoom($id: ID!, $code: String) {
-    updateRoom(id: $id, code: $code) {
-      id
-      code
-      updatedAt
-    }
-  }
-`;
-
-const onRoomUpdatedSubscription = /* GraphQL */ `
-  subscription OnRoomUpdated($id: ID!) {
-    onRoomUpdated(id: $id) {
-      id
-      code
-      updatedAt
-    }
-  }
-`;
-
+// Create API client
 const client = generateClient();
+console.log("DEBUG: API client created, client object type:", typeof client);
+console.log("DEBUG: API client methods:", Object.keys(client));
 
 const RoomEditor = () => {
-    const [roomId, setRoomId] = useState('');
-    const [code, setCode] = useState('');
-    const [isInRoom, setIsInRoom] = useState(false);
+	const [roomId, setRoomId] = useState("");
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState("");
+	const router = useRouter();
 
-    const createRoom = async () => {
-        const newRoomId = Math.random().toString(36).substring(2, 8);
-        try {
-            const result = await client.graphql({
-                query: createRoomMutation,
-                variables: {
-                    id: newRoomId,
-                    code: '',
-                    participants: [],
-                }
-            }) as { data: CreateRoomMutation };
+	const createRoom = async () => {
+		try {
+			setLoading(true);
+			setError("");
 
-            console.log('Room created:', result);
-            setRoomId(newRoomId);
-            setIsInRoom(true);
-        } catch (error) {
-            console.error('Error creating room:', error);
-        }
-    };
+			const newRoomId = Math.random().toString(36).substring(2, 8);
+			console.log("DEBUG: Creating room with ID:", newRoomId);
+			console.log("DEBUG: Mutation query being used:", createRoomMutation);
 
-    const joinRoom = async (id: string) => {
-        try {
-            const result = await client.graphql({
-                query: getRoomQuery,
-                variables: { id }
-            }) as { data: GetRoomQuery };
+			// Log variables being sent
+			const variables = {
+				input: {
+					id: newRoomId,
+					name: "New Room",
+					description: "A new collaborative coding room",
+					code: "// Start coding here...",
+					participants: [],
+					updatedAt: new Date().toISOString(),
+					createdAt: new Date().toISOString(),
+				},
+			};
+			console.log(
+				"DEBUG: Variables being passed to GraphQL:",
+				JSON.stringify(variables, null, 2)
+			);
 
-            if (result.data.getRoom) {
-                console.log('Joined room:', result.data.getRoom);
-                setRoomId(result.data.getRoom.id);
-                setCode(result.data.getRoom.code);
-                setIsInRoom(true);
-            }
-        } catch (error) {
-            console.error('Error joining room:', error);
-        }
-    };
+			console.log("DEBUG: About to make GraphQL call...");
+			const result = (await client.graphql({
+				query: createRoomMutation,
+				variables,
+			})) as GraphQLResult<any>;
+			console.log(
+				"DEBUG: GraphQL call completed, result:",
+				JSON.stringify(result, null, 2)
+			);
 
+			if (result.data?.createRoom) {
+				console.log(
+					"DEBUG: Room created successfully:",
+					JSON.stringify(result.data.createRoom, null, 2)
+				);
 
+				// Store initial code in localStorage
+				localStorage.setItem(`code-${newRoomId}`, "// Start coding here...");
 
-    const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const newCode = e.target.value;
-        setCode(newCode);
-    };
+				router.push(`/canvas?roomId=${newRoomId}`);
+			} else {
+				console.error(
+					"DEBUG: Failed to create room, result.errors:",
+					JSON.stringify(result.errors, null, 2)
+				);
+				setError("Failed to create room. Please try again.");
+			}
+		} catch (error: any) {
+			console.error("DEBUG: Error creating room:", error);
+			console.error("DEBUG: Error object type:", typeof error);
+			console.error("DEBUG: Error object keys:", Object.keys(error));
 
-    // useEffect(() => {
-    //     let subscription: { unsubscribe: () => void } | undefined;
-    //     if (roomId) {
-    //         // Wrap your subscription query with graphqlOperation to get an Observable
-    //         const observable = API.graphql({
-    //             query: onRoomUpdatedSubscription,
-    //             variables: { id: roomId },
-    //         });
-    //
-    //         subscription = (observable as any).subscribe({
-    //             next: (result: any) => {
-    //                 const updatedRoom = result.value.data.onRoomUpdated;
-    //                 console.log('Realtime update received:', updatedRoom);
-    //                 if (updatedRoom.code !== code) {
-    //                     setCode(updatedRoom.code);
-    //                 }
-    //             },
-    //             error: (error: any) => console.error('Subscription error:', error),
-    //         });
-    //     }
-    //     return () => {
-    //         if (subscription) subscription.unsubscribe();
-    //     };
-    // }, [roomId, code]);
-    return (
-        <div style={{ padding: '20px' }}>
-            {!isInRoom ? (
-                <div>
-                    <h2>Create or Join a Room</h2>
-                    <button onClick={createRoom}>Create Room</button>
-                    <div style={{ marginTop: '10px' }}>
-                        <input
-                            type="text"
-                            placeholder="Enter room ID"
-                            value={roomId}
-                            onChange={(e) => setRoomId(e.target.value)}
-                        />
-                        <button onClick={() => joinRoom(roomId)}>Join Room</button>
-                    </div>
-                </div>
-            ) : (
-                <div>
-                    <h2>Room: {roomId}</h2>
-                    <textarea
-                        value={code}
-                        onChange={handleCodeChange}
-                        rows={10}
-                        cols={50}
-                        style={{ fontFamily: 'monospace', fontSize: '14px' }}
-                    />
-                </div>
-            )}
-        </div>
-    );
+			if (error.errors) {
+				console.error(
+					"DEBUG: GraphQL errors array:",
+					JSON.stringify(error.errors, null, 2)
+				);
+				console.error("DEBUG: First error message:", error.errors[0]?.message);
+				console.error("DEBUG: First error path:", error.errors[0]?.path);
+				console.error("DEBUG: First error locations:", error.errors[0]?.locations);
+				setError(
+					error.errors[0]?.message || "Failed to create room. Please try again."
+				);
+			} else {
+				console.error("DEBUG: No errors array in error object");
+				setError("Failed to create room. Please try again.");
+			}
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const joinRoom = async (id: string) => {
+		if (!id.trim()) {
+			setError("Please enter a room ID");
+			return;
+		}
+
+		try {
+			setLoading(true);
+			setError("");
+
+			// Verify the room exists
+			const result = await client.graphql({
+				query: getRoomQuery,
+				variables: { id },
+			});
+
+			// Type assert the result to have a data property
+			const resultData = result as { data: { getRoom?: any } };
+
+			if (resultData.data?.getRoom) {
+				console.log("Room found, joining:", resultData.data.getRoom);
+				router.push(`/canvas?roomId=${id}`);
+			} else {
+				setError("Room not found. Please check the ID and try again.");
+			}
+		} catch (error) {
+			console.error("Error joining room:", error);
+			setError("Failed to join room. Please check the ID and try again.");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleLogout = async () => {
+		const { error } = await supabase.auth.signOut();
+		if (error) {
+			console.error("Error signing out:", error.message);
+		} else {
+			router.push("/");
+		}
+	};
+
+	const createRoomWithInput = async () => {
+		try {
+			setLoading(true);
+			setError("");
+
+			const newRoomId = Math.random().toString(36).substring(2, 8);
+			console.log("DEBUG: Creating room with ID:", newRoomId);
+			console.log("DEBUG: Mutation query being used:", createRoomMutation);
+
+			// Create the room with all required fields according to the schema
+			const variables = {
+				input: {
+					id: newRoomId,
+					name: "New Room",
+					description: "A new collaborative coding room",
+					code: "// Start coding here...",
+					participants: [],
+					updatedAt: new Date().toISOString(),
+					createdAt: new Date().toISOString(),
+				},
+			};
+
+			console.log(
+				"DEBUG: Variables being passed to GraphQL:",
+				JSON.stringify(variables, null, 2)
+			);
+
+			console.log("DEBUG: About to make GraphQL call...");
+			const result = (await client.graphql({
+				query: createRoomMutation,
+				variables,
+			})) as GraphQLResult<any>;
+
+			console.log(
+				"DEBUG: GraphQL call completed, result:",
+				JSON.stringify(result, null, 2)
+			);
+
+			if (result.data?.createRoom) {
+				console.log(
+					"DEBUG: Room created successfully:",
+					JSON.stringify(result.data.createRoom, null, 2)
+				);
+
+				// Store initial code in localStorage
+				localStorage.setItem(`code-${newRoomId}`, "// Start coding here...");
+
+				router.push(`/canvas?roomId=${newRoomId}`);
+			} else {
+				console.error(
+					"DEBUG: Failed to create room, result.errors:",
+					JSON.stringify(result.errors, null, 2)
+				);
+				setError("Failed to create room. Please try again.");
+			}
+		} catch (error: any) {
+			console.error("DEBUG: Error creating room:", error);
+			console.error("DEBUG: Error object type:", typeof error);
+			console.error("DEBUG: Error object keys:", Object.keys(error));
+
+			if (error.errors) {
+				console.error(
+					"DEBUG: GraphQL errors array:",
+					JSON.stringify(error.errors, null, 2)
+				);
+				console.error("DEBUG: First error message:", error.errors[0]?.message);
+				console.error("DEBUG: First error path:", error.errors[0]?.path);
+				console.error("DEBUG: First error locations:", error.errors[0]?.locations);
+				setError(
+					error.errors[0]?.message || "Failed to create room. Please try again."
+				);
+			} else {
+				console.error("DEBUG: No errors array in error object");
+				setError("Failed to create room. Please try again.");
+			}
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	return (
+		<div className='min-h-screen flex flex-col p-4'>
+			<div className='flex justify-end mb-4'>
+				<Button onClick={handleLogout}>Logout</Button>
+			</div>
+
+			<div className='flex flex-col items-center justify-center flex-grow'>
+				<div className='bg-white p-6 rounded-lg shadow-md w-full max-w-md'>
+					<h2 className='text-2xl font-bold mb-6 text-center'>
+						Collaborative Code Canvas
+					</h2>
+
+					{error && (
+						<div className='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4'>
+							{error}
+						</div>
+					)}
+
+					<div className='space-y-6'>
+						<div>
+							<Button
+								onClick={createRoomWithInput}
+								className='w-full py-2'
+								disabled={loading}
+							>
+								{loading ? "Creating..." : "Create New Room"}
+							</Button>
+						</div>
+
+						<div className='text-center'>OR</div>
+
+						<div className='space-y-2'>
+							<input
+								type='text'
+								placeholder='Enter room ID'
+								value={roomId}
+								onChange={(e) => setRoomId(e.target.value)}
+								className='w-full p-2 border rounded'
+							/>
+							<Button
+								onClick={() => joinRoom(roomId)}
+								className='w-full py-2'
+								disabled={loading}
+							>
+								{loading ? "Joining..." : "Join Room"}
+							</Button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
 };
 
 export default RoomEditor;

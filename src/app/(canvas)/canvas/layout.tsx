@@ -63,6 +63,5 @@ export default function CanvasLayout({
 				<p className='text-sm'>© {new Date().getFullYear()} Code Canvas Editor</p>
 			</footer>
 		</div>
-    
 	);
 }

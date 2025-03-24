@@ -19,7 +19,7 @@ export function configureAmplify() {
 					GraphQL: {
 						endpoint: amplifyConfig.data.url,
 						region: amplifyConfig.data.aws_region,
-						defaultAuthMode: "userPool",
+						defaultAuthMode: "apiKey",
 					},
 				},
 			},

@@ -22,7 +22,7 @@
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.1",
-    "aws-amplify": "^6.13.5",
+    "aws-amplify": "^6.13.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lodash": "^4.17.21",
