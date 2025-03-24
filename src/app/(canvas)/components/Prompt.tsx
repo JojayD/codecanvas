@@ -1,39 +1,39 @@
 "use client";
-import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
+import React, { useState, useEffect } from 'react';
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { SparklesIcon } from "lucide-react";
 
 const Prompt = () => {
     const [promptText, setPromptText] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
+    
+    // Auto-save effect that runs when promptText changes
+    useEffect(() => {
+        const debounceTimeout = setTimeout(() => {
+            if (promptText.trim()) {
+                console.log("Auto-updating with:", promptText);
+            }
+        }, 500);
 
-    const handleSubmit = async () => {
-        if (!promptText.trim()) return;
-
-        setIsLoading(true);
-        try {
-            console.log("Submitting prompt:", promptText);
-
-            // Mock API call delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Clear the input after submission
-            setPromptText("");
-        } catch (error) {
-            console.error("Error submitting prompt:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+        return () => clearTimeout(debounceTimeout);
+    }, [promptText]);
 
     return (
-        <Textarea
-            placeholder="Enter your prompt here..."
-            className="min-h-[800px] resize-none"
-            value={promptText}
-            onChange={(e) => setPromptText(e.target.value)}
-        />
+        <Card className="flex flex-col h-full border-0 shadow-none">
+            
+            <CardContent className="flex-grow flex flex-col">
+                <Textarea
+                    placeholder="Type your prompt here..."
+                    className="resize-none flex-grow border-slate-200 focus-visible:ring-blue-500"
+                    value={promptText}
+                    onChange={(e) => setPromptText(e.target.value)}
+                />
+                
+                <div className="w-full mt-2 text-xs text-slate-400 flex justify-end">
+                    <span>{promptText.length > 0 ? `${promptText.length} characters` : ''}</span>
+                </div>
+            </CardContent>
+        </Card>
     );
 };
 

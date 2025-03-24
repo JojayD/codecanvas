@@ -4,62 +4,130 @@ schema {
   subscription: Subscription
 }
 
-type CodeEditorDocuments {
+type Document {
+  content: String!
+  createdAt: AWSDateTime!
   documentId: String!
+  id: ID!
+  updatedAt: AWSDateTime!
 }
 
-type CodeEditorDocumentsConnection {
-  items: [CodeEditorDocuments]
+type ModelDocumentConnection {
+  items: [Document]!
+  nextToken: String
+}
+
+type ModelRoomConnection {
+  items: [Room]!
   nextToken: String
 }
 
 type Mutation {
-  createCodeEditorDocuments(input: CreateCodeEditorDocumentsInput!): CodeEditorDocuments
-  deleteCodeEditorDocuments(input: DeleteCodeEditorDocumentsInput!): CodeEditorDocuments
-  updateCodeEditorDocuments(input: UpdateCodeEditorDocumentsInput!): CodeEditorDocuments
+  createDocument(condition: ModelDocumentConditionInput, input: CreateDocumentInput!): Document
+  createRoom(condition: ModelRoomConditionInput, input: CreateRoomInput!): Room
+  deleteDocument(condition: ModelDocumentConditionInput, input: DeleteDocumentInput!): Document
+  deleteRoom(condition: ModelRoomConditionInput, input: DeleteRoomInput!): Room
+  updateDocument(condition: ModelDocumentConditionInput, input: UpdateDocumentInput!): Document
+  updateRoom(condition: ModelRoomConditionInput, input: UpdateRoomInput!): Room
 }
 
 type Query {
-  getCodeEditorDocuments(documentId: String!): CodeEditorDocuments
-  listCodeEditorDocuments(filter: TableCodeEditorDocumentsFilterInput, limit: Int, nextToken: String): CodeEditorDocumentsConnection
+  getDocument(id: ID!): Document
+  getRoom(id: String!): Room
+  listDocuments(filter: ModelDocumentFilterInput, limit: Int, nextToken: String): ModelDocumentConnection
+  listRooms(filter: ModelRoomFilterInput, id: String, limit: Int, nextToken: String, sortDirection: ModelSortDirection): ModelRoomConnection
+}
+
+type Room {
+  createdAt: AWSDateTime!
+  id: String!
+  participants: [String]!
+  updatedAt: AWSDateTime!
 }
 
 type Subscription {
-  onCreateCodeEditorDocuments(documentId: String): CodeEditorDocuments @aws_subscribe(mutations : ["createCodeEditorDocuments"])
-  onDeleteCodeEditorDocuments(documentId: String): CodeEditorDocuments @aws_subscribe(mutations : ["deleteCodeEditorDocuments"])
-  onUpdateCodeEditorDocuments(documentId: String): CodeEditorDocuments @aws_subscribe(mutations : ["updateCodeEditorDocuments"])
+  onCreateDocument(filter: ModelSubscriptionDocumentFilterInput): Document @aws_subscribe(mutations : ["createDocument"])
+  onCreateRoom(filter: ModelSubscriptionRoomFilterInput): Room @aws_subscribe(mutations : ["createRoom"])
+  onDeleteDocument(filter: ModelSubscriptionDocumentFilterInput): Document @aws_subscribe(mutations : ["deleteDocument"])
+  onDeleteRoom(filter: ModelSubscriptionRoomFilterInput): Room @aws_subscribe(mutations : ["deleteRoom"])
+  onUpdateDocument(filter: ModelSubscriptionDocumentFilterInput): Document @aws_subscribe(mutations : ["updateDocument"])
+  onUpdateRoom(filter: ModelSubscriptionRoomFilterInput): Room @aws_subscribe(mutations : ["updateRoom"])
 }
 
-input CreateCodeEditorDocumentsInput {
+enum ModelAttributeTypes {
+  _null
+  binary
+  binarySet
+  bool
+  list
+  map
+  number
+  numberSet
+  string
+  stringSet
+}
+
+enum ModelSortDirection {
+  ASC
+  DESC
+}
+
+input AmplifyAIConversationTurnErrorInput {
+  errorType: String!
+  message: String!
+}
+
+input CreateDocumentInput {
+  content: String!
   documentId: String!
+  id: ID
 }
 
-input DeleteCodeEditorDocumentsInput {
-  documentId: String!
+input CreateRoomInput {
+  id: String
+  participants: [String]!
+  updatedAt: AWSDateTime
 }
 
-input ModelSizeInput {
-  between: [Int]
-  eq: Int
-  ge: Int
-  gt: Int
-  le: Int
-  lt: Int
-  ne: Int
+input DeleteDocumentInput {
+  id: ID!
 }
 
-input TableBooleanFilterInput {
+input DeleteRoomInput {
+  id: String!
+}
+
+input ModelBooleanInput {
   attributeExists: Boolean
+  attributeType: ModelAttributeTypes
   eq: Boolean
   ne: Boolean
 }
 
-input TableCodeEditorDocumentsFilterInput {
-  documentId: TableStringFilterInput
+input ModelDocumentConditionInput {
+  and: [ModelDocumentConditionInput]
+  content: ModelStringInput
+  createdAt: ModelStringInput
+  documentId: ModelStringInput
+  not: ModelDocumentConditionInput
+  or: [ModelDocumentConditionInput]
+  updatedAt: ModelStringInput
 }
 
-input TableFloatFilterInput {
+input ModelDocumentFilterInput {
+  and: [ModelDocumentFilterInput]
+  content: ModelStringInput
+  createdAt: ModelStringInput
+  documentId: ModelStringInput
+  id: ModelIDInput
+  not: ModelDocumentFilterInput
+  or: [ModelDocumentFilterInput]
+  updatedAt: ModelStringInput
+}
+
+input ModelFloatInput {
   attributeExists: Boolean
+  attributeType: ModelAttributeTypes
   between: [Float]
   eq: Float
   ge: Float
@@ -69,8 +137,9 @@ input TableFloatFilterInput {
   ne: Float
 }
 
-input TableIDFilterInput {
+input ModelIDInput {
   attributeExists: Boolean
+  attributeType: ModelAttributeTypes
   beginsWith: ID
   between: [ID]
   contains: ID
@@ -84,8 +153,9 @@ input TableIDFilterInput {
   size: ModelSizeInput
 }
 
-input TableIntFilterInput {
+input ModelIntInput {
   attributeExists: Boolean
+  attributeType: ModelAttributeTypes
   between: [Int]
   eq: Int
   ge: Int
@@ -95,8 +165,38 @@ input TableIntFilterInput {
   ne: Int
 }
 
-input TableStringFilterInput {
+input ModelRoomConditionInput {
+  and: [ModelRoomConditionInput]
+  createdAt: ModelStringInput
+  not: ModelRoomConditionInput
+  or: [ModelRoomConditionInput]
+  participants: ModelStringInput
+  updatedAt: ModelStringInput
+}
+
+input ModelRoomFilterInput {
+  and: [ModelRoomFilterInput]
+  createdAt: ModelStringInput
+  id: ModelStringInput
+  not: ModelRoomFilterInput
+  or: [ModelRoomFilterInput]
+  participants: ModelStringInput
+  updatedAt: ModelStringInput
+}
+
+input ModelSizeInput {
+  between: [Int]
+  eq: Int
+  ge: Int
+  gt: Int
+  le: Int
+  lt: Int
+  ne: Int
+}
+
+input ModelStringInput {
   attributeExists: Boolean
+  attributeType: ModelAttributeTypes
   beginsWith: String
   between: [String]
   contains: String
@@ -110,6 +210,92 @@ input TableStringFilterInput {
   size: ModelSizeInput
 }
 
-input UpdateCodeEditorDocumentsInput {
-  documentId: String!
+input ModelSubscriptionBooleanInput {
+  eq: Boolean
+  ne: Boolean
+}
+
+input ModelSubscriptionDocumentFilterInput {
+  and: [ModelSubscriptionDocumentFilterInput]
+  content: ModelSubscriptionStringInput
+  createdAt: ModelSubscriptionStringInput
+  documentId: ModelSubscriptionStringInput
+  id: ModelSubscriptionIDInput
+  or: [ModelSubscriptionDocumentFilterInput]
+  updatedAt: ModelSubscriptionStringInput
+}
+
+input ModelSubscriptionFloatInput {
+  between: [Float]
+  eq: Float
+  ge: Float
+  gt: Float
+  in: [Float]
+  le: Float
+  lt: Float
+  ne: Float
+  notIn: [Float]
+}
+
+input ModelSubscriptionIDInput {
+  beginsWith: ID
+  between: [ID]
+  contains: ID
+  eq: ID
+  ge: ID
+  gt: ID
+  in: [ID]
+  le: ID
+  lt: ID
+  ne: ID
+  notContains: ID
+  notIn: [ID]
+}
+
+input ModelSubscriptionIntInput {
+  between: [Int]
+  eq: Int
+  ge: Int
+  gt: Int
+  in: [Int]
+  le: Int
+  lt: Int
+  ne: Int
+  notIn: [Int]
+}
+
+input ModelSubscriptionRoomFilterInput {
+  and: [ModelSubscriptionRoomFilterInput]
+  createdAt: ModelSubscriptionStringInput
+  id: ModelSubscriptionStringInput
+  or: [ModelSubscriptionRoomFilterInput]
+  participants: ModelSubscriptionStringInput
+  updatedAt: ModelSubscriptionStringInput
+}
+
+input ModelSubscriptionStringInput {
+  beginsWith: String
+  between: [String]
+  contains: String
+  eq: String
+  ge: String
+  gt: String
+  in: [String]
+  le: String
+  lt: String
+  ne: String
+  notContains: String
+  notIn: [String]
+}
+
+input UpdateDocumentInput {
+  content: String
+  documentId: String
+  id: ID!
+}
+
+input UpdateRoomInput {
+  id: String!
+  participants: [String]
+  updatedAt: AWSDateTime
 }

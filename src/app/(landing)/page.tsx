@@ -34,7 +34,7 @@ export default function Home() {
 		try {
 			const { data } = supabase.auth.onAuthStateChange((event, session) => {
 				if (event === "SIGNED_IN" && session) {
-					router.push("/canvas");
+					router.push("/dashboard");
 				}
 			});
 			if (data) subscription = data.subscription;

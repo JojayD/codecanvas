@@ -1,11 +1,21 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { generateClient } from "aws-amplify/api";
-import { getCurrentUser } from "aws-amplify/auth";
+import React, {
+	createContext,
+	useContext,
+	useState,
+	useEffect,
+	useCallback,
+} from "react";
+import { useSearchParams } from "next/navigation";
 import {
-	getRoomQuery,
-	updateRoomMutation,
-} from "../api/graphql/GraphQlFunctions";
+	getRoom,
+	joinRoom as joinRoomSupabase,
+	leaveRoom as leaveRoomSupabase,
+	updateRoom,
+	subscribeToRoom,
+	subscribeToCodeChanges,
+} from "@/lib/supabaseRooms";
+import { Room as SupabaseRoom } from "@/lib/supabase";
 
 type Participant = { userId: string; username: string };
 type RoomContextType = {
@@ -25,249 +35,239 @@ interface Room {
 	name: string;
 	description: string;
 	code: string;
-	createdAt: string;
-	updatedAt: string;
+	created_at: string;
+	updated_at: string;
 	participants: string[];
 }
 
-interface GetRoomQueryResponse {
-	getRoom: Room;
-}
-
-interface GraphQLResult {
-	data?: GetRoomQueryResponse;
-	errors?: any[];
-}
-
 const RoomContext = createContext<RoomContextType | null>(null);
-const client = generateClient();
 
-export const RoomProvider = ({
-	children,
-	roomId,
-}: {
+export const useRoom = () => {
+	const context = useContext(RoomContext);
+	if (!context) {
+		throw new Error("useRoom must be used within a RoomProvider");
+	}
+	return context;
+};
+
+export const RoomProvider: React.FC<{
 	children: React.ReactNode;
 	roomId: string;
-}) => {
+}> = ({ children, roomId }) => {
+	const searchParams = useSearchParams();
+	const roomIdFromParams = searchParams.get("roomId") || "";
+
+	const [room, setRoom] = useState<Room | null>(null);
+	const [code, setCode] = useState<string>("");
 	const [participants, setParticipants] = useState<Participant[]>([]);
-	const [code, setCode] = useState("// Start coding here...");
-	const [loading, setLoading] = useState(true);
+	const [loading, setLoading] = useState<boolean>(true);
 	const [error, setError] = useState<Error | null>(null);
-	const [currentUser, setCurrentUser] = useState({ userId: "", username: "" });
+	const [hasJoined, setHasJoined] = useState<boolean>(false);
 
-	// Initialize the user (authenticated or guest)
+	// Mock user for now - in a real app, this would come from auth
+	// Use a stable user ID for testing multiple tabs/windows
+	const [currentUser] = useState(() => {
+		// Create a persistent user ID or use an existing one
+		let userId = localStorage.getItem("userId");
+		let username = localStorage.getItem("username");
+
+		if (!userId || !username) {
+			userId = `user-${Math.random().toString(36).substring(2, 7)}`;
+			username = `User-${Math.random().toString(36).substring(2, 5)}`;
+			localStorage.setItem("userId", userId);
+			localStorage.setItem("username", username);
+		}
+
+		return { userId, username };
+	});
+
+	// Fetch room data on initial load
 	useEffect(() => {
-		const initializeUser = async () => {
+		async function fetchRoom() {
+			if (!roomIdFromParams) return;
+
 			try {
-				// Try to get authenticated user
-				const userInfo = await getCurrentUser();
-				setCurrentUser({
-					userId: userInfo.userId,
-					username: userInfo.username || userInfo.userId,
-				});
-			} catch (error) {
-				console.error("Auth error:", error);
-				// Use a guest user ID if not authenticated
-				const guestId = `guest-${Math.random().toString(36).substring(2, 8)}`;
-				setCurrentUser({
-					userId: guestId,
-					username: `Guest-${guestId.slice(-4)}`,
-				});
-				// We'll consider this a normal state, not an error
-				setError(null);
-			}
-		};
-
-		initializeUser();
-	}, []);
-
-	// Fetch room data when roomId changes
-	useEffect(() => {
-		if (!currentUser.userId || !roomId) return;
-
-		const fetchRoom = async () => {
-			try {
-				console.log("Fetching room data for ID:", roomId);
-
-				// Make sure we have a valid room ID
-				if (!roomId) {
-					console.log("Invalid room ID, using default values");
-					setLoading(false);
-					return;
-				}
-
-				// Fetch room data
-				const result = await client.graphql({
-					query: getRoomQuery,
-					variables: { id: roomId },
-				});
-
-				const typedResult = result as unknown as GraphQLResult;
-				console.log("Room data response:", JSON.stringify(typedResult, null, 2));
-
-				// Handle GraphQL errors
-				if (typedResult.errors && typedResult.errors.length > 0) {
-					console.error(
-						"GraphQL errors:",
-						JSON.stringify(typedResult.errors, null, 2)
-					);
-					setLoading(false);
-					return;
-				}
-
-				const roomData = typedResult.data?.getRoom;
+				setLoading(true);
+				console.log("Fetching room data for:", roomIdFromParams);
+				const roomData = await getRoom(roomIdFromParams);
 
 				if (roomData) {
-					console.log("Room data found:", JSON.stringify(roomData, null, 2));
+					console.log("Room data received:", roomData);
+					setRoom(roomData);
+					setCode(roomData.code || "// Start coding here...");
 
-					// Try to load code from localStorage
-					const savedCode = localStorage.getItem(`code-${roomId}`);
-					if (savedCode) {
-						setCode(savedCode);
-					}
+					// Ensure participants is an array
+					const participantsList = Array.isArray(roomData.participants)
+						? roomData.participants
+						: [];
 
-					// Parse participants
-					if (roomData.participants && Array.isArray(roomData.participants)) {
-						const participantList = roomData.participants
-							.map((p: string) => {
-								try {
-									const parts = p.split(":");
-									if (parts.length >= 2) {
-										return {
-											userId: parts[0],
-											username: parts[1],
-										};
-									}
-									return null;
-								} catch (err) {
-									console.warn(`Error parsing participant: ${p}`, err);
-									return null;
-								}
-							})
-							.filter((p): p is Participant => p !== null);
+					// Parse participants from array of strings to array of objects
+					const parsedParticipants = participantsList.map((p) => {
+						const parts = p.split(":");
+						return {
+							userId: parts[0] || "",
+							username: parts[1] || "Unknown",
+						};
+					});
 
-						setParticipants(participantList);
-					}
+					setParticipants(parsedParticipants);
+
+					// Check if the current user is already in the room
+					const isUserInRoom = parsedParticipants.some(
+						(p) => p.userId === currentUser.userId
+					);
+
+					setHasJoined(isUserInRoom);
 				} else {
-					console.log("Room not found, will create on join");
+					console.error("Room not found:", roomIdFromParams);
+					setError(new Error("Room not found"));
 				}
-
-				setLoading(false);
-			} catch (err) {
-				console.error("Error fetching room:", err);
+			} catch (error) {
+				console.error("Error fetching room:", error);
+				setError(
+					error instanceof Error ? error : new Error("Failed to fetch room")
+				);
+			} finally {
 				setLoading(false);
 			}
-		};
+		}
 
 		fetchRoom();
+	}, [roomIdFromParams, currentUser.userId]);
 
-		// Set up polling for participant updates
-		const interval = setInterval(fetchRoom, 5000);
-		return () => clearInterval(interval);
-	}, [roomId, currentUser.userId]);
+	// Set up real-time subscription for room changes
+	useEffect(() => {
+		if (!roomIdFromParams) return;
 
-	// Join room function - adds current user to participants
-	const joinRoom = async () => {
-		try {
-			// Check if the user is already in the participants list
-			const existingParticipant = participants.find(
-				(p) => p.userId === currentUser.userId
-			);
-			if (existingParticipant) {
-				console.log("User already in room, skipping join");
-				return;
-			}
+		console.log("Setting up real-time subscriptions for room:", roomIdFromParams);
 
-			// Create participant strings in format "userId:username"
-			const participantsList = [
-				...participants.map((p) => `${p.userId}:${p.username}`),
-				`${currentUser.userId}:${currentUser.username}`,
-			];
+		// Subscribe to room updates (participants)
+		const roomSubscription = subscribeToRoom(roomIdFromParams, (updatedRoom) => {
+			console.log("Room update received:", updatedRoom);
+			setRoom(updatedRoom);
 
-			console.log("Joining room with participants:", participantsList);
+			// Ensure participants is an array
+			const participantsList = Array.isArray(updatedRoom.participants)
+				? updatedRoom.participants
+				: [];
 
-			// Update the room with new participant
-			const result = await client.graphql({
-				query: updateRoomMutation,
-				variables: {
-					input: {
-						id: roomId,
-						participants: participantsList,
-					},
-				},
+			// Parse participants
+			const parsedParticipants = participantsList.map((p) => {
+				const parts = p.split(":");
+				return {
+					userId: parts[0] || "",
+					username: parts[1] || "Unknown",
+				};
 			});
 
-			console.log("Join room result:", result);
+			setParticipants(parsedParticipants);
+		});
 
-			// Update local state
-			setParticipants([
-				...participants,
-				{ userId: currentUser.userId, username: currentUser.username },
-			]);
+		// Subscribe to code changes
+		const codeSubscription = subscribeToCodeChanges(
+			roomIdFromParams,
+			(updatedCode) => {
+				console.log("Code update received, length:", updatedCode?.length || 0);
+				setCode(updatedCode || "");
+			}
+		);
+
+		return () => {
+			// Clean up subscriptions
+			console.log("Cleaning up subscriptions");
+			roomSubscription.unsubscribe();
+			codeSubscription.unsubscribe();
+		};
+	}, [roomIdFromParams]);
+
+	// Join room function - memoized with useCallback
+	const joinRoom = useCallback(async () => {
+		if (hasJoined) {
+			console.log("Already joined this room, skipping");
+			return;
+		}
+
+		try {
+			console.log("Joining room as:", currentUser);
+
+			const result = await joinRoomSupabase(
+				roomIdFromParams,
+				currentUser.userId,
+				currentUser.username
+			);
+
+			if (result) {
+				console.log("Successfully joined room");
+				setHasJoined(true);
+			} else {
+				console.error("Failed to join room, no result returned");
+			}
 		} catch (error) {
 			console.error("Error joining room:", error);
-
-			// Create a more detailed error object
-			const errObj =
-				error instanceof Error ? error : new Error("Failed to join room");
-
-			// Log more info about the error
-			if (error && typeof error === "object" && "errors" in error) {
-				console.error("GraphQL errors:", error);
-			}
-
-			setError(errObj);
+			setError(error instanceof Error ? error : new Error("Failed to join room"));
 		}
-	};
+	}, [roomIdFromParams, currentUser, hasJoined]);
 
-	// Leave room function - removes current user from participants
-	const leaveRoom = async () => {
+	// Leave room function - memoized with useCallback
+	const leaveRoom = useCallback(async () => {
+		if (!hasJoined) {
+			console.log("Not joined this room, skipping leave");
+			return;
+		}
+
 		try {
-			const participantsList = participants
-				.filter((p) => p.userId !== currentUser.userId)
-				.map((p) => `${p.userId}:${p.username}`);
-
-			console.log("Leaving room, remaining participants:", participantsList);
-
-			const result = await client.graphql({
-				query: updateRoomMutation,
-				variables: {
-					input: {
-						id: roomId,
-						participants: participantsList,
-					},
-				},
-			});
-
-			console.log("Leave room result:", result);
-			setParticipants(participants.filter((p) => p.userId !== currentUser.userId));
+			console.log("Leaving room:", roomIdFromParams);
+			await leaveRoomSupabase(roomIdFromParams, currentUser.userId);
+			console.log("Successfully left room");
+			setHasJoined(false);
 		} catch (error) {
 			console.error("Error leaving room:", error);
 			setError(error instanceof Error ? error : new Error("Failed to leave room"));
 		}
-	};
+	}, [roomIdFromParams, currentUser.userId, hasJoined]);
 
-	// Update code function - stores in localStorage only
-	const updateCode = async (newCode: string) => {
-		try {
-			// Update local state
-			setCode(newCode);
+	// Update code function - memoized with useCallback
+	const updateCode = useCallback(
+		async (newCode: string) => {
+			try {
+				setCode(newCode);
 
-			// Store in localStorage
-			localStorage.setItem(`code-${roomId}`, newCode);
-			console.log("Code updated locally:", newCode.substring(0, 20) + "...");
-		} catch (error) {
-			console.error("Error updating code:", error);
-			setError(
-				error instanceof Error ? error : new Error("Failed to update code")
-			);
+				// Update the code in Supabase
+				await updateRoom(roomIdFromParams, { code: newCode });
+			} catch (error) {
+				console.error("Error updating code:", error);
+				setError(
+					error instanceof Error ? error : new Error("Failed to update code")
+				);
+			}
+		},
+		[roomIdFromParams]
+	);
+
+	// Auto-join the room when the component mounts and room data is loaded
+	useEffect(() => {
+		if (!loading && room && !hasJoined) {
+			console.log("Auto-joining room after initial load");
+			joinRoom();
 		}
-	};
+	}, [loading, room, hasJoined, joinRoom]);
+
+	// Clean up when component unmounts
+	useEffect(() => {
+		return () => {
+			if (hasJoined) {
+				console.log("Component unmounting, leaving room");
+				leaveRoomSupabase(roomIdFromParams, currentUser.userId)
+					.then(() => console.log("Left room on unmount"))
+					.catch((err) => console.error("Error leaving room on unmount:", err));
+			}
+		};
+	}, [roomIdFromParams, currentUser.userId, hasJoined]);
 
 	return (
 		<RoomContext.Provider
 			value={{
-				roomId,
+				roomId: roomIdFromParams,
 				participants,
 				code,
 				updateCode,
@@ -281,12 +281,4 @@ export const RoomProvider = ({
 			{children}
 		</RoomContext.Provider>
 	);
-};
-
-export const useRoom = () => {
-	const context = useContext(RoomContext);
-	if (!context) {
-		throw new Error("useRoom must be used within a RoomProvider");
-	}
-	return context;
 };

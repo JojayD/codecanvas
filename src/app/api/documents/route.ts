@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveCodeDocument, getCodeDocument } from "@/lib/dynamodb";
 import {createServerClient} from "@supabase/ssr";
-import {getSupabaseUUID} from "@/app/utils/supabase/lib/getSupabaseUUID";
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
