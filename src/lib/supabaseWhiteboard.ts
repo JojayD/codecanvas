@@ -4,26 +4,20 @@ import { Whiteboard, WhiteboardContent, KonvaShape } from "./supabase";
 import { v4 as uuidv4 } from "uuid";
 
 // Initialize an empty whiteboard content
-const createEmptyContent = (): WhiteboardContent => ({
+export const createEmptyContent = (): WhiteboardContent => ({
 	shapes: [],
 	version: 1,
 	lastUpdated: new Date().toISOString(),
 });
 
-/**
- * Create a new whiteboard for a room
- * @param roomId - The ID of the room to create a whiteboard for
- * @param creatorId - The UUID of the user creating the whiteboard (optional)
- * @returns The created whiteboard or null if there was an error
- */
 export async function createWhiteboard(
 	roomId: string,
 	creatorId?: string
 ): Promise<Whiteboard | null> {
 	try {
-		const whiteboardId = uuidv4();
+		// No need to generate ID as it's auto-generated in the database
 		console.log(
-			`Creating new whiteboard with ID ${whiteboardId} for room ${roomId}${creatorId ? ` by user ${creatorId}` : ""}`
+			`Creating new whiteboard for room ${roomId}${creatorId ? ` by user ${creatorId}` : ""}`
 		);
 
 		const emptyContent = createEmptyContent();
@@ -32,12 +26,12 @@ export async function createWhiteboard(
 			.from("whiteboards")
 			.insert([
 				{
-					id: whiteboardId,
-					roomId: roomId,
+					// Don't specify id as it's auto-generated
+					room_id: roomId, // Use snake_case to match DB schema
 					content: JSON.stringify(emptyContent),
 					created_at: new Date().toISOString(),
 					updated_at: new Date().toISOString(),
-					created_by: creatorId || null,
+					user_id: creatorId || null, // Use snake_case to match DB schema
 				},
 			])
 			.select()
@@ -64,7 +58,7 @@ export async function getWhiteboard(
 		const { data, error } = await supabase
 			.from("whiteboards")
 			.select("*")
-			.eq("roomId", roomId)
+			.eq("room_id", roomId)
 			.single();
 
 		if (error) {
@@ -89,7 +83,7 @@ export async function getWhiteboard(
  */
 export async function updateWhiteboard(
 	id: string,
-	content: string
+	content: WhiteboardContent
 ): Promise<Whiteboard | null> {
 	try {
 		console.log(`Updating whiteboard ${id} with new content`);
@@ -97,7 +91,7 @@ export async function updateWhiteboard(
 		const { data, error } = await supabase
 			.from("whiteboards")
 			.update({
-				content,
+				content: JSON.stringify(content),
 				updated_at: new Date().toISOString(),
 			})
 			.eq("id", id)
@@ -118,7 +112,22 @@ export async function updateWhiteboard(
  */
 export function parseWhiteboardContent(contentStr: string): WhiteboardContent {
 	try {
-		return JSON.parse(contentStr) as WhiteboardContent;
+		// Add validation to ensure we're working with a valid JSON string
+		if (typeof contentStr !== "string") {
+			console.warn("Content is not a string:", contentStr);
+			return createEmptyContent();
+		}
+
+		// Try to parse the JSON string
+		const parsed = JSON.parse(contentStr);
+
+		// Validate the parsed content has the expected structure
+		if (!parsed || !Array.isArray(parsed.shapes)) {
+			console.warn("Invalid whiteboard content structure:", parsed);
+			return createEmptyContent();
+		}
+
+		return parsed as WhiteboardContent;
 	} catch (error) {
 		console.error("Error parsing whiteboard content:", error);
 		return createEmptyContent();
@@ -156,7 +165,7 @@ export async function addShape(
 		content.lastUpdated = new Date().toISOString();
 
 		// Update whiteboard
-		return await updateWhiteboard(whiteboardId, JSON.stringify(content));
+		return await updateWhiteboard(whiteboardId, content);
 	} catch (error) {
 		console.error("Error adding shape:", error);
 		return null;
@@ -196,7 +205,7 @@ export async function updateShape(
 			content.lastUpdated = new Date().toISOString();
 
 			// Update whiteboard
-			return await updateWhiteboard(whiteboardId, JSON.stringify(content));
+			return await updateWhiteboard(whiteboardId, content);
 		}
 
 		throw new Error(`Shape with ID ${shapeId} not found`);
@@ -232,7 +241,7 @@ export async function deleteShape(
 		content.lastUpdated = new Date().toISOString();
 
 		// Update whiteboard
-		return await updateWhiteboard(whiteboardId, JSON.stringify(content));
+		return await updateWhiteboard(whiteboardId, content);
 	} catch (error) {
 		console.error("Error deleting shape:", error);
 		return null;
@@ -264,7 +273,16 @@ export function subscribeToWhiteboardChanges(
 					console.log("Whiteboard was deleted");
 					return;
 				}
-				callback(payload.new as Whiteboard);
+
+				// Make sure we have a properly formatted whiteboard with string content
+				const whiteboard = payload.new as Whiteboard;
+
+				// Check if content is already an object and stringify it if needed
+				if (whiteboard.content && typeof whiteboard.content === "object") {
+					whiteboard.content = JSON.stringify(whiteboard.content);
+				}
+
+				callback(whiteboard);
 			}
 		)
 		.subscribe((status: { event: string; status: string }) => {

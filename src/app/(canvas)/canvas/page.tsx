@@ -212,22 +212,7 @@ function Canvas() {
 									Leave Room
 								</button>
 							</li>
-							<li>
-								<a
-									href='/canvas'
-									className='hover:underline'
-								>
-									Editor
-								</a>
-							</li>
-							<li>
-								<a
-									href='/examples'
-									className='hover:underline'
-								>
-									Examples
-								</a>
-							</li>
+
 							<li>
 								<button
 									onClick={handleLogout}
@@ -298,7 +283,7 @@ function Canvas() {
 						className='bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
 						onClick={handleDebug}
 					>
-						Debug
+						Info
 					</button>
 					<span className='text-sm text-gray-300'>
 						Your ID: {currentUser.userId}

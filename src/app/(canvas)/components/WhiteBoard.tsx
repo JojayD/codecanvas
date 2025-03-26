@@ -9,6 +9,7 @@ import {
 	addShape,
 	updateShape,
 	deleteShape,
+	createEmptyContent,
 } from "@/lib/supabaseWhiteboard";
 import {
 	Stage,
@@ -46,13 +47,18 @@ const WhiteBoard = () => {
 	const isLocalChange = useRef(true);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [tool, setTool] = useState<
-		"select" | "rectangle" | "circle" | "line" | "text"
+		"select" | "rectangle" | "circle" | "line" | "text" | "eraser"
 	>("select");
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [newLine, setNewLine] = useState<number[]>([]);
 	const stageRef = useRef<any>(null);
 	const layerRef = useRef<any>(null);
 	const transformerRef = useRef<any>(null);
+	const [cursorPosition, setCursorPosition] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
+	const [eraserSize, setEraserSize] = useState(20);
 
 	// Load and subscribe to whiteboard
 	useEffect(() => {
@@ -66,8 +72,24 @@ const WhiteBoard = () => {
 
 				if (whiteboard) {
 					setWhiteboardId(whiteboard.id);
-					// Parse the content
-					const parsedContent = parseWhiteboardContent(whiteboard.content);
+
+					// Parse the content - handle both string and object
+					let parsedContent: WhiteboardContent;
+					if (typeof whiteboard.content === "string") {
+						parsedContent = parseWhiteboardContent(whiteboard.content);
+					} else if (
+						typeof whiteboard.content === "object" &&
+						whiteboard.content !== null
+					) {
+						// Already an object, validate structure
+						const objContent = whiteboard.content as any;
+						parsedContent = objContent.shapes
+							? (objContent as WhiteboardContent)
+							: createEmptyContent();
+					} else {
+						parsedContent = createEmptyContent();
+					}
+
 					setContent(parsedContent);
 
 					// Subscribe to changes
@@ -76,7 +98,23 @@ const WhiteBoard = () => {
 						(updatedWhiteboard) => {
 							console.log("Received whiteboard update");
 							isLocalChange.current = false;
-							const updatedContent = parseWhiteboardContent(updatedWhiteboard.content);
+
+							// Handle content - could be string or object
+							let updatedContent: WhiteboardContent;
+							if (typeof updatedWhiteboard.content === "string") {
+								updatedContent = parseWhiteboardContent(updatedWhiteboard.content);
+							} else if (
+								typeof updatedWhiteboard.content === "object" &&
+								updatedWhiteboard.content !== null
+							) {
+								const objContent = updatedWhiteboard.content as any;
+								updatedContent = objContent.shapes
+									? (objContent as WhiteboardContent)
+									: createEmptyContent();
+							} else {
+								updatedContent = createEmptyContent();
+							}
+
 							setContent(updatedContent);
 							// Reset selected shape when whiteboard is updated
 							setSelectedId(null);
@@ -132,7 +170,7 @@ const WhiteBoard = () => {
 
 			console.log("Saving whiteboard content");
 			try {
-				await updateWhiteboard(whiteboardId, JSON.stringify(newContent));
+				await updateWhiteboard(whiteboardId, newContent);
 			} catch (error) {
 				console.error("Error saving whiteboard content:", error);
 			}
@@ -179,16 +217,18 @@ const WhiteBoard = () => {
 				s.id === id ? { ...s, ...updates } : s
 			);
 
-			return {
+			const newContent = {
 				...prev,
 				shapes: newShapes,
 				version: prev.version + 1,
 				lastUpdated: new Date().toISOString(),
 			};
-		});
 
-		// Save to Supabase with debounce
-		saveContent(content);
+			// Save to Supabase with debounce using the updated content
+			saveContent(newContent);
+
+			return newContent;
+		});
 	};
 
 	// Handle shape deletion
@@ -245,6 +285,14 @@ const WhiteBoard = () => {
 	};
 
 	const handleMouseMove = (e: any) => {
+		// Update cursor position for eraser
+		if (tool === "eraser") {
+			const pos = e.target.getStage().getPointerPosition();
+			setCursorPosition(pos);
+		} else {
+			setCursorPosition(null);
+		}
+
 		// No drawing - skipping
 		if (!isDrawing) {
 			return;
@@ -285,6 +333,12 @@ const WhiteBoard = () => {
 		const stage = e.target.getStage();
 		const pos = stage.getPointerPosition();
 
+		// Handle eraser tool
+		if (tool === "eraser") {
+			eraseAtPosition(pos);
+			return;
+		}
+
 		// Add shape based on selected tool
 		if (tool === "rectangle") {
 			const newRect: Omit<KonvaShape, "id"> = {
@@ -322,6 +376,121 @@ const WhiteBoard = () => {
 				draggable: true,
 			};
 			handleAddShape(newText);
+		}
+	};
+
+	// Helper functions for eraser
+	const dist2 = (v: any, w: any) => {
+		return (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+	};
+
+	const distToSegment = (p: any, v: any, w: any) => {
+		const l2 = dist2(v, w);
+		if (l2 === 0) return Math.sqrt(dist2(p, v));
+
+		let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+		t = Math.max(0, Math.min(1, t));
+
+		return Math.sqrt(
+			dist2(p, {
+				x: v.x + t * (w.x - v.x),
+				y: v.y + t * (w.y - v.y),
+			})
+		);
+	};
+
+	// Function to erase at a specific position
+	const eraseAtPosition = (pos: { x: number; y: number }) => {
+		if (!layerRef.current || !whiteboardId) return;
+
+		// Find shapes under the eraser
+		const shapesToErase: string[] = [];
+
+		// Check each shape
+		content.shapes.forEach((shape) => {
+			let shouldErase = false;
+
+			if (shape.type === "line" && shape.points) {
+				// For lines, check each segment
+				for (let i = 0; i < shape.points.length - 2; i += 2) {
+					const x1 = shape.points[i] + (shape.x || 0);
+					const y1 = shape.points[i + 1] + (shape.y || 0);
+					const x2 = shape.points[i + 2] + (shape.x || 0);
+					const y2 = shape.points[i + 3] + (shape.y || 0);
+
+					// Calculate distance from point to line segment
+					const distance = distToSegment(pos, { x: x1, y: y1 }, { x: x2, y: y2 });
+
+					if (distance < eraserSize) {
+						shouldErase = true;
+						break;
+					}
+				}
+			} else if (shape.type === "rect" && shape.width && shape.height) {
+				// For rectangles
+				const { x, y, width, height } = shape;
+				if (
+					pos.x >= x! - eraserSize &&
+					pos.x <= x! + width + eraserSize &&
+					pos.y >= y! - eraserSize &&
+					pos.y <= y! + height + eraserSize
+				) {
+					shouldErase = true;
+				}
+			} else if (shape.type === "circle" && shape.radius) {
+				// For circles
+				const distance = Math.sqrt(
+					Math.pow(pos.x - shape.x!, 2) + Math.pow(pos.y - shape.y!, 2)
+				);
+				if (distance <= shape.radius + eraserSize) {
+					shouldErase = true;
+				}
+			} else if (shape.type === "text") {
+				// For text, use a simple bounding box check
+				const node = layerRef.current.findOne(`#${shape.id}`);
+				if (node) {
+					const bounds = node.getClientRect();
+					if (
+						pos.x >= bounds.x - eraserSize &&
+						pos.x <= bounds.x + bounds.width + eraserSize &&
+						pos.y >= bounds.y - eraserSize &&
+						pos.y <= bounds.y + bounds.height + eraserSize
+					) {
+						shouldErase = true;
+					}
+				}
+			}
+
+			if (shouldErase) {
+				shapesToErase.push(shape.id);
+			}
+		});
+
+		// Erase all found shapes
+		if (shapesToErase.length > 0) {
+			// Mark this as a local change
+			isLocalChange.current = true;
+
+			// Create a new content object with filtered shapes
+			const newContent = {
+				...content,
+				shapes: content.shapes.filter((shape) => !shapesToErase.includes(shape.id)),
+				version: content.version + 1,
+				lastUpdated: new Date().toISOString(),
+			};
+
+			// Update local state
+			setContent(newContent);
+
+			// Save to Supabase
+			saveContent(newContent);
+
+			// Delete each shape from Supabase
+			shapesToErase.forEach((id) => {
+				deleteShape(whiteboardId!, id).catch((error) => {
+					console.error(`Error deleting shape ${id}:`, error);
+				});
+			});
 		}
 	};
 
@@ -490,8 +659,27 @@ const WhiteBoard = () => {
 					>
 						Text
 					</button>
+					<button
+						className={`px-2 py-1 text-xs rounded ${tool === "eraser" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
+						onClick={() => setTool("eraser")}
+					>
+						Eraser
+					</button>
 				</div>
 				<div className='flex items-center space-x-2'>
+					{tool === "eraser" && (
+						<div className='flex items-center space-x-2'>
+							<span className='text-xs'>Size:</span>
+							<input
+								type='range'
+								min='5'
+								max='50'
+								value={eraserSize}
+								onChange={(e) => setEraserSize(parseInt(e.target.value))}
+								className='w-20 h-2'
+							/>
+						</div>
+					)}
 					{selectedId && (
 						<button
 							className='px-2 py-1 text-xs rounded bg-red-500 text-white'
@@ -513,9 +701,9 @@ const WhiteBoard = () => {
 					onMouseUp={handleMouseUp}
 					onClick={handleStageClick}
 					ref={stageRef}
+					style={{ cursor: tool === "eraser" ? "none" : "default" }}
 				>
 					<Layer ref={layerRef}>
-						{/* Render the saved shapes */}
 						{content.shapes.map((shape) => renderShape(shape))}
 
 						{/* Render the current line being drawn */}
@@ -524,6 +712,18 @@ const WhiteBoard = () => {
 								points={newLine}
 								stroke='#000'
 								strokeWidth={2}
+							/>
+						)}
+
+						{/* Eraser cursor */}
+						{tool === "eraser" && cursorPosition && (
+							<Circle
+								x={cursorPosition.x}
+								y={cursorPosition.y}
+								radius={eraserSize}
+								fill='rgba(255, 0, 0, 0.2)'
+								stroke='red'
+								strokeWidth={1}
 							/>
 						)}
 

@@ -1,7 +1,5 @@
 "use client";
 import React from "react";
-import { supabase } from "../../../app/utils/supabase/lib/supabaseClient";
-import { useRouter } from "next/navigation";
 
 export default function CanvasLayout({
 	children,

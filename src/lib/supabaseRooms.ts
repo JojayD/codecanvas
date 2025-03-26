@@ -16,7 +16,7 @@ export async function createRoom(
 		// Generate a numeric ID if not provided
 		if (!roomData.roomId) {
 			// Generate a numeric ID to match the bigint column 	type in Supabase
-			roomData.roomId = Math.floor(Math.random() * 1000000).toString();
+			roomData.roomId = Math.floor(Math.random() * 1000000);
 		}
 
 		const { data, error } = await supabase

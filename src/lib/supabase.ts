@@ -1,9 +1,9 @@
 import { supabase } from "./supabaseClient";
 
-// Type definitions for Room table
+
 export interface Room {
 	id: string;
-	roomId?: string;
+	roomId?: number;
 	name?: string;
 	description?: string;
 	code?: string;
@@ -15,7 +15,7 @@ export interface Room {
 	createdBy?: string;
 }
 
-// Konva shape types
+
 export interface KonvaShape {
 	id: string;
 	type: string;
@@ -35,27 +35,27 @@ export interface KonvaShape {
 	scaleY?: number;
 }
 
-// Whiteboard content structure
+
 export interface WhiteboardContent {
 	shapes: KonvaShape[];
 	version: number;
 	lastUpdated: string;
 }
 
-// Type definitions for Whiteboard table
+
 export interface Whiteboard {
-	id: string; // UUID primary key
-	roomId: string; // Foreign key to rooms table
-	content: string; // JSON stringified whiteboard content (WhiteboardContent)
+	id: string; 
+	room_id: number; 
+	content: string; 
 	created_at?: string;
 	updated_at?: string;
-	createdBy?: string; // Store the creator's UUID
+	user_id?: string; 
 }
 
-// Type for creating a new room
+
 export interface CreateRoomPayload {
 	id?: string;
-	roomId?: string;
+	roomId?: number;
 	name: string;
 	description: string;
 	code: string;
@@ -65,10 +65,10 @@ export interface CreateRoomPayload {
 	created_by?: string;
 }
 
-// Type for updating a room
+
 export interface UpdateRoomPayload {
 	name?: string;
-	roomId?: string;
+	roomId?: number;
 	description?: string;
 	code?: string;
 	prompt?: string;

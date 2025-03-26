@@ -223,38 +223,38 @@ export const RoomProvider: React.FC<{
 
 		// Set up polling as a fallback for real-time updates
 		// This will refresh room data every 5 seconds in case real-time updates fail
-		const pollingInterval = setInterval(async () => {
-			try {
-				console.log("Polling for room updates...");
-				const roomData = await getRoom(roomIdFromParams);
+		// const pollingInterval = setInterval(async () => {
+		// 	try {
+		// 		console.log("Polling for room updates...");
+		// 		const roomData = await getRoom(roomIdFromParams);
 
-				if (roomData) {
-					// Only update if we got valid data
-					console.log("Room data refreshed through polling");
-					setRoom(roomData);
+		// 		if (roomData) {
+		// 			// Only update if we got valid data
+		// 			console.log("Room data refreshed through polling");
+		// 			setRoom(roomData);
 
-					// Ensure participants is an array
-					const participantsList = Array.isArray(roomData.participants)
-						? roomData.participants
-						: [];
+		// 			// Ensure participants is an array
+		// 			const participantsList = Array.isArray(roomData.participants)
+		// 				? roomData.participants
+		// 				: [];
 
-					// Parse participants
-					const parsedParticipants = participantsList.map((p) => {
-						const parts = p.split(":");
-						return {
-							userId: parts[0] || "",
-							username: parts[1] || "Unknown",
-						};
-					});
+		// 			// Parse participants
+		// 			const parsedParticipants = participantsList.map((p) => {
+		// 				const parts = p.split(":");
+		// 				return {
+		// 					userId: parts[0] || "",
+		// 					username: parts[1] || "Unknown",
+		// 				};
+		// 			});
 
-					setParticipants(parsedParticipants);
-					setCode(roomData.code || "");
-					setPrompt(roomData.prompt || "");
-				}
-			} catch (error) {
-				console.error("Error polling for room updates:", error);
-			}
-		}, 5000); // Poll every 5 seconds
+		// 			setParticipants(parsedParticipants);
+		// 			setCode(roomData.code || "");
+		// 			setPrompt(roomData.prompt || "");
+		// 		}
+		// 	} catch (error) {
+		// 		console.error("Error polling for room updates:", error);
+		// 	}
+		// }, 5000); // Poll every 5 seconds
 
 		return () => {
 			// Clean up subscriptions and polling
@@ -262,7 +262,7 @@ export const RoomProvider: React.FC<{
 			if (roomSubscription) roomSubscription.unsubscribe();
 			if (codeSubscription) codeSubscription.unsubscribe();
 			if (promptSubscription) promptSubscription.unsubscribe();
-			clearInterval(pollingInterval);
+			// clearInterval(pollingInterval);
 		};
 	}, [roomIdFromParams]);
 
