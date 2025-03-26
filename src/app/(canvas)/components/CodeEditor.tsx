@@ -45,7 +45,6 @@ const CodeEditor = ({
 		// Only update if the new value is different from current state
 		// and it's not a result of a local change
 		if (defaultValue !== code) {
-			console.log("Received external code update, updating editor");
 			isLocalChange.current = false; // Mark this as an external change
 			setCode(defaultValue);
 		}
@@ -64,7 +63,6 @@ const CodeEditor = ({
 				}
 
 				if (data?.session) {
-					console.log("Session loaded successfully:", data.session);
 					setSession(data.session);
 					setAuthError(null);
 					if (documentId) {
@@ -91,7 +89,6 @@ const CodeEditor = ({
 		const {
 			data: { subscription },
 		} = supabase.auth.onAuthStateChange((event, currentSession) => {
-			console.log("Auth state change:", event);
 			setSession(currentSession);
 			if (event === "SIGNED_OUT") {
 				setAuthError("Not authenticated - Please login");
@@ -126,8 +123,6 @@ const CodeEditor = ({
 				setCurrentLang(data.language);
 				if (onLanguageChange) onLanguageChange(data.language);
 			}
-
-			console.log("Document loaded successfully");
 		} catch (error) {
 			console.error("Error fetching document:", error);
 		} finally {
@@ -145,7 +140,6 @@ const CodeEditor = ({
 
 			try {
 				setSaveStatus("saving");
-				console.log("Saving document...");
 
 				const response = await fetch("/api/documents", {
 					method: "POST",
@@ -165,7 +159,6 @@ const CodeEditor = ({
 					throw new Error(errorData.error || `Failed to save: ${response.status}`);
 				}
 
-				console.log("Document saved successfully");
 				setSaveStatus("saved");
 
 				// Reset save status after a delay

@@ -67,7 +67,7 @@ const WhiteBoard = () => {
 		const loadWhiteboard = async () => {
 			try {
 				setLoading(true);
-				console.log("Loading whiteboard for room:", roomId);
+
 				const whiteboard = await getWhiteboard(roomId);
 
 				if (whiteboard) {
@@ -96,7 +96,6 @@ const WhiteBoard = () => {
 					subscription = subscribeToWhiteboardChanges(
 						whiteboard.id,
 						(updatedWhiteboard) => {
-							console.log("Received whiteboard update");
 							isLocalChange.current = false;
 
 							// Handle content - could be string or object
@@ -137,7 +136,6 @@ const WhiteBoard = () => {
 		// Cleanup subscription
 		return () => {
 			if (subscription) {
-				console.log("Cleaning up whiteboard subscription");
 				subscription.unsubscribe();
 			}
 		};
@@ -168,7 +166,6 @@ const WhiteBoard = () => {
 				return;
 			}
 
-			console.log("Saving whiteboard content");
 			try {
 				await updateWhiteboard(whiteboardId, newContent);
 			} catch (error) {

@@ -107,10 +107,8 @@ function Canvas() {
 	// Force join the room when component mounts
 	useEffect(() => {
 		const joinRoomNow = async () => {
-			console.log("Attempting to join room on mount");
 			try {
 				await joinRoom();
-				console.log("Joined room on mount");
 			} catch (error) {
 				console.error("Error joining room on mount:", error);
 			}
@@ -136,7 +134,7 @@ function Canvas() {
 	const handleLeaveRoom = async () => {
 		try {
 			await leaveRoom();
-			console.log("Successfully left the room");
+
 			router.push("/dashboard");
 		} catch (error) {
 			console.error("Error leaving room:", error);
@@ -146,16 +144,12 @@ function Canvas() {
 	const handleJoinRoom = async () => {
 		try {
 			await joinRoom();
-			console.log("Manually joined room");
 		} catch (error) {
 			console.error("Error manually joining room:", error);
 		}
 	};
 
 	const handleDebug = () => {
-		console.log("Room ID:", roomId);
-		console.log("Current User:", currentUser);
-		console.log("Participants:", participants);
 		setShowDebug(!showDebug);
 	};
 

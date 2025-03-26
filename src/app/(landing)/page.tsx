@@ -72,8 +72,9 @@ export default function Home() {
 							Collaborative Coding Made Simple
 						</h2>
 						<p className='text-lg text-gray-700 mb-8'>
-							A powerful platform for real-time code collaboration, learning, and
-							teaching. Create, share, and build together in a seamless environment.
+							A dynamic platform designed to simulate technical whiteboard interviews
+							through real-time code collaboration, making it easier to practice,
+							learn, and teach coding interview skills.
 						</p>
 						<div className='flex flex-col sm:flex-row gap-4'>
 							<GoogleLoginButton />
@@ -97,16 +98,15 @@ export default function Home() {
 							<div className='pt-7 px-4 h-full overflow-hidden font-mono text-sm'>
 								<pre className='text-gray-800'>
 									<code>
-										{`function greet() {
-  console.log("Welcome to Code Canvas!");
-}
+{`def greet() {
+		print("Welcome to Code Canvas!");
+	}
 
-// Real-time collaboration
-// Code sharing
-// Interactive lessons
-// And much more...
+	// Real-time collaboration
+	// Code sharing
+	// And much more...
 
-greet();`}
+	greet();`}
 									</code>
 								</pre>
 							</div>
@@ -124,17 +124,19 @@ greet();`}
 					<div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
 						{[
 							{
-								title: "Real-time Collaboration",
+								title: "Real-Time Collaboration",
 								description:
-									"Work together with teammates in real-time on the same codebase.",
+									"Simulate live technical interviews with instant code sharing and feedback.",
 							},
 							{
-								title: "Interactive Learning",
-								description: "Perfect for teaching and learning programming concepts.",
+								title: "Interview-Focused Learning",
+								description:
+									"Designed for practicing data structures, algorithms, and whiteboard-style problem solving.",
 							},
 							{
-								title: "Cross-Platform",
-								description: "Access your projects from anywhere, on any device.",
+								title: "Cross-Platform Access",
+								description:
+									"Run interviews or practice sessions seamlessly from any device, anywhere.",
 							},
 						].map((feature, index) => (
 							<div
@@ -156,8 +158,7 @@ greet();`}
 				<div className='container mx-auto px-4 text-center '>
 					<h2 className='text-3xl font-bold mb-6'>Ready to start coding?</h2>
 					<p className='text-xl mb-8 max-w-2xl mx-auto'>
-						Join thousands of developers who are already using Code Canvas to build
-						amazing projects.
+						Join Code Canvas to practice coding with your friends and teammates.
 					</p>
 					<div className='mb-4'>
 						<GoogleLoginButton />
