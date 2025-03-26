@@ -1,15 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+	// 1) Add the removeConsole compiler option:
+	compiler: {
+		// Only remove console.* in production builds
+		removeConsole: process.env.NODE_ENV === "production",
+	},
+
 	webpack: (config: any, { isServer }: { isServer: boolean }) => {
-		// Handle canvas module properly
+		// 2) Keep your existing canvas handling:
 		if (!isServer) {
-			// Don't attempt to import canvas module on client-side
 			config.resolve.fallback = {
 				...config.resolve.fallback,
 				canvas: false,
 			};
 		} else {
-			// On server-side, mock the canvas module
 			config.externals = [...(config.externals || []), "canvas"];
 		}
 
