@@ -375,7 +375,7 @@ function Canvas() {
 const ProtectedCanvas = withAuthProtection(Canvas);
 
 // Main page component with simplified error handling
-export default function CanvasPage() {
+const CanvasPage = () => {
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const roomIdParam = searchParams.get("roomId");
@@ -410,5 +410,13 @@ export default function CanvasPage() {
 		<RoomProvider roomId={roomIdParam}>
 			<ProtectedCanvas />
 		</RoomProvider>
+	);
+};
+
+export default function Page() {
+	return (
+		<Suspense fallback={<div>Loading...</div>}>
+			<CanvasPage />
+		</Suspense>
 	);
 }
