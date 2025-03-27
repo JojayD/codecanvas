@@ -38,6 +38,43 @@ if (!supabaseInstance) {
 // Export the client (will never be null)
 export const supabase = supabaseInstance || createMockClient();
 
+// Check and refresh authentication token
+export async function checkAndRefreshAuth() {
+	try {
+		console.log("Checking auth status...");
+		const { data, error } = await supabase.auth.getSession();
+
+		if (error) {
+			console.error("Session error:", error.message);
+			return {
+				isValid: false,
+				message: `Session error: ${error.message}`,
+			};
+		}
+
+		if (!data.session) {
+			console.log("No active session found");
+			return {
+				isValid: false,
+				message: "No active session found",
+			};
+		}
+
+		// Always assume session is valid if we have one
+		console.log("Session found and appears valid");
+		return {
+			isValid: true,
+			session: data.session,
+		};
+	} catch (e) {
+		console.error("Auth check failed:", e);
+		return {
+			isValid: false,
+			message: `Auth check error: ${e instanceof Error ? e.message : "Unknown error"}`,
+		};
+	}
+}
+
 // Helper function to create a mock client
 function createMockClient() {
 	console.warn("Using mock Supabase client");

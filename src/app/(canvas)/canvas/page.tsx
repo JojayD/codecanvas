@@ -6,8 +6,9 @@ import { RoomProvider, useRoom } from "@/app/context/RoomContextProivider";
 import { SplitPane } from "@rexxars/react-split-pane";
 import dynamic from "next/dynamic";
 import Prompt from "../components/Prompt";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import React from "react";
+import { withAuthProtection } from "@/app/context/AuthProvider";
 
 // Dynamically import the CodeEditor component to avoid SSR issues
 const DynamicCodeEditor = dynamic(
@@ -370,41 +371,44 @@ function Canvas() {
 	);
 }
 
-// Component to handle room ID extraction and provide it to RoomProvider
-function CanvasWithParams() {
-	const searchParams = useSearchParams();
-	const roomId = searchParams.get("roomId");
+// Apply the withAuthProtection HOC to the Canvas component directly without the wrapper function
+const ProtectedCanvas = withAuthProtection(Canvas);
 
-	if (!roomId) {
+// Main page component with simplified error handling
+export default function CanvasPage() {
+	const searchParams = useSearchParams();
+	const router = useRouter();
+	const roomIdParam = searchParams.get("roomId");
+	const [isLoaded, setIsLoaded] = useState(false);
+
+	// Check for roomId and redirect if needed
+	useEffect(() => {
+		if (!roomIdParam) {
+			console.log("No room ID provided, redirecting to dashboard");
+			router.push("/dashboard");
+		} else {
+			// Mark as loaded after a short delay to ensure we have the param
+			setTimeout(() => setIsLoaded(true), 500);
+		}
+	}, [roomIdParam, router]);
+
+	// Loading state
+	if (!isLoaded || !roomIdParam) {
 		return (
-			<div className='p-4 text-center'>
-				No room ID provided. Please join or create a room first.
+			<div className='flex items-center justify-center h-screen'>
+				<div className='text-center'>
+					<div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4'></div>
+					<p>{roomIdParam ? "Loading room..." : "Redirecting to dashboard..."}</p>
+				</div>
 			</div>
 		);
 	}
 
+	// Render the room with the wrapped component
+	console.log("Rendering room with ID:", roomIdParam);
 	return (
-		<div
-			style={{
-				width: "100vw",
-				height: "100vh",
-				padding: 0,
-				margin: 0,
-				overflow: "hidden",
-			}}
-		>
-			<RoomProvider roomId={roomId}>
-				<Canvas />
-			</RoomProvider>
-		</div>
-	);
-}
-
-// Main page component with Suspense boundary for useSearchParams
-export default function CanvasPage() {
-	return (
-		<Suspense fallback={<div className='p-4 text-center'>Loading...</div>}>
-			<CanvasWithParams />
-		</Suspense>
+		<RoomProvider roomId={roomIdParam}>
+			<ProtectedCanvas />
+		</RoomProvider>
 	);
 }

@@ -6,7 +6,8 @@ import ChoiceEditor from "@/app/(canvas)/components/ChoiceEditor";
 import { debounce } from "lodash";
 import { v4 as uuidv4 } from "uuid";
 import { Session } from "@supabase/supabase-js";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase, checkAndRefreshAuth } from "@/lib/supabaseClient";
+import { useAuth } from "@/app/context/AuthProvider";
 
 type EditorProps = {
 	defaultValue?: string;
@@ -31,11 +32,13 @@ const CodeEditor = ({
 	const [docId, setDocId] = useState(documentId || uuidv4());
 	const [currentLang, setCurrentLang] = useState(language);
 	const [isLoading, setIsLoading] = useState(!!documentId);
-	const [session, setSession] = useState<Session | null>(null);
-	const [authError, setAuthError] = useState<string | null>(null);
 	const [saveStatus, setSaveStatus] = useState<
 		"idle" | "saving" | "saved" | "error"
 	>("idle");
+
+	// Use the auth context instead of managing session directly
+	const { session, error: authContextError, refreshAuth } = useAuth();
+	const [authError, setAuthError] = useState<string | null>(authContextError);
 
 	// Flag to track if edit is local or remote
 	const isLocalChange = useRef(true);
@@ -50,66 +53,51 @@ const CodeEditor = ({
 		}
 	}, [defaultValue]);
 
+	// Initialize document and handle auth changes
 	useEffect(() => {
-		const initAuth = async () => {
-			try {
-				// Use the singleton supabase client imported from your lib/supabaseClient.ts
-				const { data, error } = (await supabase.auth.getSession()) as {
-					data: { session: Session | null };
-					error: Error | null;
-				};
-				if (error) {
-					throw error;
-				}
+		if (documentId) {
+			fetchDocument();
+		} else {
+			setIsLoading(false);
+		}
 
-				if (data?.session) {
-					setSession(data.session);
-					setAuthError(null);
-					if (documentId) {
-						fetchDocument();
-					} else {
-						setIsLoading(false);
-					}
-				} else {
-					console.error("No active session found");
-					setAuthError("Not authenticated - Please login");
-					setIsLoading(false);
-				}
-			} catch (error) {
-				console.error("Auth initialization error:", error);
-				setAuthError(
-					`Authentication error: ${error instanceof Error ? error.message : "Unknown error"}`
-				);
-				setIsLoading(false);
-			}
-		};
-
-		initAuth();
-
-		const {
-			data: { subscription },
-		} = supabase.auth.onAuthStateChange((event, currentSession) => {
-			setSession(currentSession);
-			if (event === "SIGNED_OUT") {
-				setAuthError("Not authenticated - Please login");
-			} else if (event === "SIGNED_IN" && currentSession) {
-				setAuthError(null);
-			}
-		});
-
-		return () => {
-			subscription.unsubscribe();
-		};
-	}, [documentId]);
+		// Update auth error when context error changes
+		if (authContextError) {
+			setAuthError(authContextError);
+		}
+	}, [documentId, authContextError]);
 
 	const fetchDocument = async () => {
 		if (!docId) return;
 
 		try {
 			setIsLoading(true);
+
+			// Refresh auth before fetching
+			if (session) {
+				await refreshAuth();
+			}
+
 			const response = await fetch(`/api/documents?id=${docId}`);
 
 			if (!response.ok) {
+				// Handle 401 errors by refreshing token and retrying
+				if (response.status === 401) {
+					await refreshAuth();
+					const retryResponse = await fetch(`/api/documents?id=${docId}`);
+					if (!retryResponse.ok) {
+						throw new Error(`Failed to fetch after refresh: ${retryResponse.status}`);
+					}
+					const data = await retryResponse.json();
+					setCode(data.content || defaultValue);
+					if (data.language) {
+						setCurrentLang(data.language);
+						if (onLanguageChange) onLanguageChange(data.language);
+					}
+					setIsLoading(false);
+					return;
+				}
+
 				const errorData = await response.json().catch(() => ({}));
 				throw new Error(
 					errorData.error || `Failed to fetch document: ${response.status}`
@@ -125,6 +113,9 @@ const CodeEditor = ({
 			}
 		} catch (error) {
 			console.error("Error fetching document:", error);
+			setAuthError(
+				error instanceof Error ? error.message : "Failed to fetch document"
+			);
 		} finally {
 			setIsLoading(false);
 		}
@@ -141,6 +132,9 @@ const CodeEditor = ({
 			try {
 				setSaveStatus("saving");
 
+				// Refresh auth before saving
+				await refreshAuth();
+
 				const response = await fetch("/api/documents", {
 					method: "POST",
 					headers: {
@@ -155,6 +149,35 @@ const CodeEditor = ({
 				});
 
 				if (!response.ok) {
+					// Handle 401 errors by refreshing token and retrying
+					if (response.status === 401) {
+						const refreshed = await refreshAuth();
+						if (refreshed && session) {
+							// Retry the save with the new token
+							const retryResponse = await fetch("/api/documents", {
+								method: "POST",
+								headers: {
+									"Content-Type": "application/json",
+									Authorization: `Bearer ${session.access_token}`,
+								},
+								body: JSON.stringify({
+									documentId: docId,
+									content,
+									language: lang,
+								}),
+							});
+
+							if (retryResponse.ok) {
+								setSaveStatus("saved");
+								setTimeout(() => setSaveStatus("idle"), 2000);
+								return;
+							}
+							throw new Error(
+								`Failed to save after token refresh: ${retryResponse.status}`
+							);
+						}
+					}
+
 					const errorData = await response.json().catch(() => ({}));
 					throw new Error(errorData.error || `Failed to save: ${response.status}`);
 				}
@@ -171,7 +194,7 @@ const CodeEditor = ({
 				);
 			}
 		}, 1000),
-		[session, docId]
+		[session, docId, refreshAuth]
 	);
 
 	const handleEditorChange = (value: string | undefined) => {

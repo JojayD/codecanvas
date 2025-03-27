@@ -11,6 +11,7 @@ import {
 	deleteShape,
 	createEmptyContent,
 } from "@/lib/supabaseWhiteboard";
+import { useAuth } from "@/app/context/AuthProvider";
 import {
 	Stage,
 	Layer,
@@ -37,6 +38,7 @@ const debounce = (func: Function, wait: number) => {
 
 const WhiteBoard = () => {
 	const { roomId } = useRoom();
+	const { refreshAuth } = useAuth();
 	const [whiteboardId, setWhiteboardId] = useState<string | null>(null);
 	const [content, setContent] = useState<WhiteboardContent>({
 		shapes: [],
@@ -67,6 +69,9 @@ const WhiteBoard = () => {
 		const loadWhiteboard = async () => {
 			try {
 				setLoading(true);
+
+				// Refresh auth before loading whiteboard
+				await refreshAuth();
 
 				const whiteboard = await getWhiteboard(roomId);
 
@@ -139,7 +144,7 @@ const WhiteBoard = () => {
 				subscription.unsubscribe();
 			}
 		};
-	}, [roomId]);
+	}, [roomId, refreshAuth]);
 
 	// Update transformer on selection change
 	useEffect(() => {
@@ -167,6 +172,8 @@ const WhiteBoard = () => {
 			}
 
 			try {
+				// Refresh auth before saving
+				await refreshAuth();
 				await updateWhiteboard(whiteboardId, newContent);
 			} catch (error) {
 				console.error("Error saving whiteboard content:", error);
@@ -191,6 +198,8 @@ const WhiteBoard = () => {
 
 		// Save to Supabase
 		try {
+			// Refresh auth before adding shape
+			await refreshAuth();
 			const result = await addShape(whiteboardId, shape);
 			if (result) {
 				// Update with real ID from server
