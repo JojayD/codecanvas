@@ -9,16 +9,19 @@ const Prompt = () => {
 	const { prompt, updatePrompt } = useRoom();
 	const [localPrompt, setLocalPrompt] = useState(prompt || "");
 	const isLocalChange = useRef(true);
+	const isUserTyping = useRef(false);
+	const lastUserEdit = useRef({ timestamp: 0 });
 
 	// Update localPrompt when room prompt changes (from other users)
 	useEffect(() => {
 		// Only update if different from current state and not from local changes
-		if (prompt !== localPrompt) {
+		// AND the user is not currently typing
+		if (prompt !== localPrompt && !isUserTyping.current) {
 			console.log("Received external prompt update, updating textarea");
 			isLocalChange.current = false; // Mark this as an external change
-			setLocalPrompt(prompt);
+			setLocalPrompt(prompt || "");
 		}
-	}, [prompt]);
+	}, [prompt, localPrompt]);
 
 	// Debounced function for updating the prompt in Supabase
 	const debouncedUpdatePrompt = useRef(
@@ -26,6 +29,14 @@ const Prompt = () => {
 			if (isLocalChange.current) {
 				console.log("Sending prompt update to server");
 				updatePrompt(text);
+
+				// Set a timeout to mark when typing stops
+				setTimeout(() => {
+					const now = Date.now();
+					if (now - lastUserEdit.current.timestamp >= 1000) {
+						isUserTyping.current = false;
+					}
+				}, 1100);
 			} else {
 				// Reset flag after handling external update
 				isLocalChange.current = true;
@@ -43,6 +54,11 @@ const Prompt = () => {
 	}, [localPrompt, debouncedUpdatePrompt]);
 
 	const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+		// Mark that the user is actively typing
+		isUserTyping.current = true;
+		lastUserEdit.current.timestamp = Date.now();
+
+		// Only update if this is a local change
 		if (isLocalChange.current) {
 			setLocalPrompt(e.target.value);
 		} else {
@@ -52,23 +68,17 @@ const Prompt = () => {
 	};
 
 	return (
-		<Card className='flex flex-col h-full border-0 shadow-none'>
-			<CardContent className='flex-grow flex flex-col'>
+		<Card className='w-full h-full flex flex-col overflow-hidden'>
+			<CardContent className='flex-grow p-3 flex flex-col overflow-hidden'>
+				<div className='mb-2 font-medium'>
+					Share your thoughts with collaborators:
+				</div>
 				<Textarea
-					placeholder='Type your prompt here...'
-					className='resize-none flex-grow border-slate-200 focus-visible:ring-blue-500'
+					placeholder='Enter any notes, questions, or ideas here...'
+					className='h-full resize-none'
 					value={localPrompt}
 					onChange={handlePromptChange}
 				/>
-
-				<div className='w-full mt-2 text-xs text-slate-400 flex justify-between'>
-					<span className='text-slate-500'>
-						{localPrompt !== prompt && "Syncing..."}
-					</span>
-					<span>
-						{localPrompt.length > 0 ? `${localPrompt.length} characters` : ""}
-					</span>
-				</div>
 			</CardContent>
 		</Card>
 	);

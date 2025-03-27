@@ -42,16 +42,19 @@ const CodeEditor = ({
 
 	// Flag to track if edit is local or remote
 	const isLocalChange = useRef(true);
+	const isUserTyping = useRef(false);
+	const lastLocalEdit = useRef({ timestamp: 0, content: "" });
 
 	// Update code when defaultValue changes (for real-time updates)
 	useEffect(() => {
 		// Only update if the new value is different from current state
 		// and it's not a result of a local change
-		if (defaultValue !== code) {
+		if (defaultValue !== code && !isUserTyping.current) {
+			console.log("Received external code update, updating editor");
 			isLocalChange.current = false; // Mark this as an external change
 			setCode(defaultValue);
 		}
-	}, [defaultValue]);
+	}, [defaultValue, code]);
 
 	// Initialize document and handle auth changes
 	useEffect(() => {
@@ -199,6 +202,22 @@ const CodeEditor = ({
 
 	const handleEditorChange = (value: string | undefined) => {
 		const newValue = value || "";
+
+		// Track that the user is actively typing and record timestamp
+		isUserTyping.current = true;
+		lastLocalEdit.current = {
+			timestamp: Date.now(),
+			content: newValue,
+		};
+
+		// Set a timeout to mark when typing stops
+		setTimeout(() => {
+			const now = Date.now();
+			// If this timeout is from our most recent edit and enough time has passed
+			if (now - lastLocalEdit.current.timestamp >= 1000) {
+				isUserTyping.current = false;
+			}
+		}, 1100); // Just after the debounce timeout
 
 		// Only trigger onChange if this is a local change, not from props
 		if (isLocalChange.current) {

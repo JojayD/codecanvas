@@ -5,6 +5,7 @@ import React, {
 	useState,
 	useEffect,
 	useCallback,
+	useRef,
 } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -45,7 +46,7 @@ export const useRoom = () => {
 
 export const RoomProvider: React.FC<{
 	children: React.ReactNode;
-	roomId: string;
+	roomId: string | number;
 }> = ({ children, roomId }) => {
 	const searchParams = useSearchParams();
 	const roomIdFromParams = searchParams.get("roomId") || "";
@@ -73,6 +74,14 @@ export const RoomProvider: React.FC<{
 		}
 
 		return { userId, username };
+	});
+
+	// Add a ref to track the last local update timestamp and change ID
+	const lastLocalUpdate = useRef({
+		timestamp: 0,
+		code: "",
+		prompt: "",
+		changeId: "",
 	});
 
 	// Fetch room data on initial load
@@ -177,15 +186,22 @@ export const RoomProvider: React.FC<{
 				lastUpdate: new Date().toISOString(),
 			});
 
+			// Only update if this is not our own recent change and the code is different
+			const now = Date.now();
+			const timeSinceLocalUpdate = now - lastLocalUpdate.current.timestamp;
+			const isOurRecentChange =
+				timeSinceLocalUpdate < 5000 && // Within last 5 seconds
+				updatedCode === lastLocalUpdate.current.code; // Same code we just sent
+
+			if (isOurRecentChange) {
+				console.log("Ignoring update as it's our own recent change");
+				return;
+			}
+
 			// Force a complete state update for the code
-			if (typeof updatedCode === "string") {
-				setCode((prev) => {
-					if (prev !== updatedCode) {
-						console.log("Updating code state with new value");
-						return updatedCode;
-					}
-					return prev;
-				});
+			if (typeof updatedCode === "string" && updatedCode !== code) {
+				console.log("Updating code state with new value from remote");
+				setCode(updatedCode);
 			}
 		})
 			.then((subscription) => {
@@ -203,15 +219,22 @@ export const RoomProvider: React.FC<{
 				lastUpdate: new Date().toISOString(),
 			});
 
+			// Only update if this is not our own recent change and the prompt is different
+			const now = Date.now();
+			const timeSinceLocalUpdate = now - lastLocalUpdate.current.timestamp;
+			const isOurRecentChange =
+				timeSinceLocalUpdate < 5000 && // Within last 5 seconds
+				updatedPrompt === lastLocalUpdate.current.prompt; // Same prompt we just sent
+
+			if (isOurRecentChange) {
+				console.log("Ignoring prompt update as it's our own recent change");
+				return;
+			}
+
 			// Force a complete state update for the prompt
-			if (typeof updatedPrompt === "string") {
-				setPrompt((prev) => {
-					if (prev !== updatedPrompt) {
-						console.log("Updating prompt state with new value");
-						return updatedPrompt;
-					}
-					return prev;
-				});
+			if (typeof updatedPrompt === "string" && updatedPrompt !== prompt) {
+				console.log("Updating prompt state with new value from remote");
+				setPrompt(updatedPrompt);
 			}
 		})
 			.then((subscription) => {
@@ -264,7 +287,7 @@ export const RoomProvider: React.FC<{
 			if (promptSubscription) promptSubscription.unsubscribe();
 			// clearInterval(pollingInterval);
 		};
-	}, [roomIdFromParams]);
+	}, [roomIdFromParams, code]); // Add code as dependency to compare with incoming updates
 
 	// Join room function - memoized with useCallback
 	const joinRoom = useCallback(async () => {
@@ -316,11 +339,24 @@ export const RoomProvider: React.FC<{
 	const updateCode = useCallback(
 		async (newCode: string) => {
 			try {
+				// Generate a unique change ID
+				const changeId = Date.now().toString();
+
 				// Set the local state immediately for a responsive UI
 				setCode(newCode);
+
+				// Record that we just made a local update
+				lastLocalUpdate.current = {
+					...lastLocalUpdate.current, // Keep existing values
+					timestamp: Date.now(),
+					code: newCode,
+					changeId,
+				};
+
 				console.log("Sending code update to Supabase:", {
 					length: newCode.length,
 					firstChars: newCode.substring(0, 20),
+					changeId,
 				});
 
 				// Update the code in Supabase
@@ -342,11 +378,24 @@ export const RoomProvider: React.FC<{
 	const updatePrompt = useCallback(
 		async (newPrompt: string) => {
 			try {
+				// Generate a unique change ID
+				const changeId = Date.now().toString();
+
 				// Set the local state immediately for a responsive UI
 				setPrompt(newPrompt);
+
+				// Record that we just made a local update
+				lastLocalUpdate.current = {
+					...lastLocalUpdate.current,
+					timestamp: Date.now(),
+					prompt: newPrompt,
+					changeId,
+				};
+
 				console.log("Sending prompt update to Supabase:", {
 					length: newPrompt.length,
 					firstChars: newPrompt.substring(0, 20),
+					changeId,
 				});
 
 				// Update the prompt in Supabase
