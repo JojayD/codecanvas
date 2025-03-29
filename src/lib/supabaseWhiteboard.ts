@@ -11,13 +11,15 @@ export const createEmptyContent = (): WhiteboardContent => ({
 });
 
 export async function createWhiteboard(
-	roomId: string,
+	roomId: string | number,
 	creatorId?: string
 ): Promise<Whiteboard | null> {
 	try {
-		// No need to generate ID as it's auto-generated in the database
+		// Convert roomId to number if it's a string to match the database type
+		const parsedRoomId = typeof roomId === "string" ? parseInt(roomId) : roomId;
+
 		console.log(
-			`Creating new whiteboard for room ${roomId}${creatorId ? ` by user ${creatorId}` : ""}`
+			`Creating new whiteboard for room ${parsedRoomId}${creatorId ? ` by user ${creatorId}` : ""}`
 		);
 
 		const emptyContent = createEmptyContent();
@@ -27,7 +29,7 @@ export async function createWhiteboard(
 			.insert([
 				{
 					// Don't specify id as it's auto-generated
-					room_id: roomId, // Use snake_case to match DB schema
+					room_id: parsedRoomId, // Use snake_case to match DB schema
 					content: JSON.stringify(emptyContent),
 					created_at: new Date().toISOString(),
 					updated_at: new Date().toISOString(),
@@ -50,22 +52,25 @@ export async function createWhiteboard(
  * Get whiteboard for a room
  */
 export async function getWhiteboard(
-	roomId: string
+	roomId: string | number
 ): Promise<Whiteboard | null> {
 	try {
-		console.log(`Fetching whiteboard for room ${roomId}`);
+		// Convert roomId to number if it's a string to match the database type
+		const parsedRoomId = typeof roomId === "string" ? parseInt(roomId) : roomId;
+
+		console.log(`Fetching whiteboard for room ${parsedRoomId}`);
 
 		const { data, error } = await supabase
 			.from("whiteboards")
 			.select("*")
-			.eq("room_id", roomId)
+			.eq("room_id", parsedRoomId)
 			.single();
 
 		if (error) {
 			// If no whiteboard exists, create one
 			if (error.code === "PGRST116") {
 				console.log("No whiteboard found, creating a new one");
-				return createWhiteboard(roomId);
+				return createWhiteboard(parsedRoomId);
 			}
 			throw error;
 		}

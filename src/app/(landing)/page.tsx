@@ -160,7 +160,7 @@ export default function Home() {
 					<p className='text-xl mb-8 max-w-2xl mx-auto'>
 						Join Code Canvas to practice coding with your friends and teammates.
 					</p>
-					<div className='mb-4'>
+					<div className='mb-4 flex justify-center'>
 						<GoogleLoginButton />
 					</div>
 				</div>

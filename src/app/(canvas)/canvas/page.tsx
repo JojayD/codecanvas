@@ -44,10 +44,25 @@ function Canvas() {
 		leaveRoom,
 		loading,
 		error,
-	} = useRoom();
+		language,
+		updateLanguage,
+	} = useRoom() as {
+		roomId: string | number;
+		code: string;
+		updateCode: (code: string) => void;
+		participants: Array<{ userId: string; username: string }>;
+		currentUser: { userId: string; username: string };
+		joinRoom: () => Promise<void>;
+		leaveRoom: () => Promise<void>;
+		loading: boolean;
+		error: Error | null;
+		language: string;
+		updateLanguage: (language: string) => Promise<void>;
+	};
 
 	// Add debug state
 	const [showDebug, setShowDebug] = useState(false);
+	const [roomIdString, setRoomIdString] = useState<string>("");
 
 	// Add state for update notifications
 	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -87,6 +102,10 @@ function Canvas() {
 		// Update the ref with current participants
 		prevParticipantsRef.current = currentParticipantIds;
 	}, [participants]);
+
+	useEffect(() => {
+		setRoomIdString(roomId?.toString() || "");
+	}, [roomId]);
 
 	// Handle code updates
 	useEffect(() => {
@@ -189,7 +208,7 @@ function Canvas() {
 							<button
 								className='ml-2 text-xs bg-blue-700 hover:bg-blue-900 px-2 py-1 rounded'
 								onClick={() => {
-									navigator.clipboard.writeText(roomId);
+									navigator.clipboard.writeText(roomIdString);
 									alert("Room ID copied to clipboard!");
 								}}
 							>
@@ -357,8 +376,10 @@ function Canvas() {
 						<div className='h-full overflow-hidden'>
 							<DynamicCodeEditor
 								defaultValue={code}
+								language={language}
 								key={`editor-${roomId}`}
 								onChange={(value) => updateCode(value || "")}
+								onLanguageChange={(newLang) => updateLanguage(newLang)}
 							/>
 						</div>
 						<div className='h-full overflow-hidden'>

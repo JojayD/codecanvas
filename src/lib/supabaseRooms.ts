@@ -30,12 +30,12 @@ export async function createRoom(
 		// Create a whiteboard for this room
 		if (data) {
 			try {
-				console.log(`Creating whiteboard for room ${data.id}`);
-				const whiteboard = await createWhiteboard(data.id, roomData.created_by);
+				console.log(`Creating whiteboard for room ${data.roomId}`);
+				const whiteboard = await createWhiteboard(data.roomId, roomData.created_by);
 				if (!whiteboard) {
-					console.warn(`Failed to create whiteboard for room ${data.id}`);
+					console.warn(`Failed to create whiteboard for room ${data.roomId}`);
 				} else {
-					console.log(`Whiteboard created successfully for room ${data.id}`);
+					console.log(`Whiteboard created successfully for room ${data.roomId}`);
 				}
 			} catch (whiteboardError) {
 				console.error("Error creating whiteboard:", whiteboardError);
@@ -53,26 +53,32 @@ export async function createRoom(
 /**
  * Get a room by ID
  */
-export async function getRoom(roomId: string): Promise<Room | null> {
+export async function getRoom(roomId: string | number): Promise<Room | null> {
 	try {
-		console.log(`Fetching room with ID: ${roomId}`);
-		// Try looking up by id first
+		console.log(`Fetching room with roomId: ${roomId}`);
+		// Try looking up by roomId first (prioritize this)
 		let data;
 		let error;
 
+		// Convert to number if it's a string
+		const roomIdNumber = typeof roomId === "string" ? parseInt(roomId) : roomId;
+
+		// First try with roomId field (the random number) - more secure
 		const result = await supabase
 			.from("rooms")
 			.select("*")
-			.eq("id", roomId)
+			.eq("roomId", roomIdNumber)
 			.single();
 
 		if (result.error || !result.data) {
-			console.log(`No room found with id=${roomId}, trying roomId field`);
-			// Try with roomId field if id lookup fails
+			console.log(
+				`No room found with roomId=${roomIdNumber}, trying id field as fallback`
+			);
+			// Fall back to id field if roomId lookup fails
 			const altResult = await supabase
 				.from("rooms")
 				.select("*")
-				.eq("roomId", roomId)
+				.eq("id", roomId)
 				.single();
 
 			data = altResult.data;
@@ -83,7 +89,7 @@ export async function getRoom(roomId: string): Promise<Room | null> {
 		}
 
 		if (error) throw error;
-		if (!data) throw new Error(`Room not found with ID: ${roomId}`);
+		if (!data) throw new Error(`Room not found with roomId: ${roomId}`);
 
 		console.log(`Room found:`, data);
 		return data;
@@ -97,7 +103,7 @@ export async function getRoom(roomId: string): Promise<Room | null> {
  * Update a room
  */
 export async function updateRoom(
-	roomId: string,
+	roomId: string | number,
 	updates: UpdateRoomPayload
 ): Promise<Room | null> {
 	try {
@@ -105,14 +111,14 @@ export async function updateRoom(
 		// Get the room first to determine which ID field to use
 		const room = await getRoom(roomId);
 		if (!room) {
-			throw new Error(`Cannot update - room not found with ID: ${roomId}`);
+			throw new Error(`Cannot update - room not found with roomId: ${roomId}`);
 		}
 
-		// Use the actual ID from the room object
+		// Use the actual database ID for the update operation (required by Supabase)
 		const { data, error } = await supabase
 			.from("rooms")
 			.update(updates)
-			.eq("id", room.id) // Always use the primary key ID
+			.eq("id", room.id) // Must use primary key ID for database updates
 			.select()
 			.single();
 
@@ -128,7 +134,7 @@ export async function updateRoom(
  * Join a room (add participant)
  */
 export async function joinRoom(
-	roomId: string,
+	roomId: string | number,
 	userId: string,
 	username: string
 ): Promise<Room | null> {
@@ -158,8 +164,10 @@ export async function joinRoom(
 		const updatedParticipants = [...participants, participantString];
 		console.log("Updating participants:", updatedParticipants);
 
-		// Use the room.id directly to ensure we update the correct record
-		return await updateRoom(room.id, { participants: updatedParticipants });
+		// Use the room.roomId to ensure we use the random ID for updates
+		return await updateRoom(room.roomId || room.id, {
+			participants: updatedParticipants,
+		});
 	} catch (error) {
 		console.error("Error joining room:", error);
 		return null;
@@ -170,7 +178,7 @@ export async function joinRoom(
  * Leave a room (remove participant)
  */
 export async function leaveRoom(
-	roomId: string,
+	roomId: string | number,
 	userId: string
 ): Promise<Room | null> {
 	try {
@@ -194,8 +202,10 @@ export async function leaveRoom(
 		);
 
 		console.log("Updating participants:", updatedParticipants);
-		// Use the room.id directly to ensure we update the correct record
-		return await updateRoom(room.id, { participants: updatedParticipants });
+		// Use the room.roomId to ensure we use the random ID for updates
+		return await updateRoom(room.roomId || room.id, {
+			participants: updatedParticipants,
+		});
 	} catch (error) {
 		console.error("Error leaving room:", error);
 		return null;
@@ -206,7 +216,7 @@ export async function leaveRoom(
  * Subscribe to room changes
  */
 export function subscribeToRoom(
-	roomId: string,
+	roomId: string | number,
 	callback: (room: Room) => void
 ) {
 	console.log(`Setting up subscription for room ${roomId}`);
@@ -260,7 +270,7 @@ export function subscribeToRoom(
  * Subscribe to code changes
  */
 export function subscribeToCodeChanges(
-	roomId: string,
+	roomId: string | number,
 	callback: (code: string) => void
 ) {
 	console.log(`Setting up code subscription for room ${roomId}`);
@@ -317,7 +327,7 @@ export function subscribeToCodeChanges(
  * Subscribe to prompt changes
  */
 export function subscribeToPromptChanges(
-	roomId: string,
+	roomId: string | number,
 	callback: (prompt: string) => void
 ) {
 	console.log(`Setting up prompt subscription for room ${roomId}`);
@@ -369,6 +379,65 @@ export function subscribeToPromptChanges(
 			return {
 				unsubscribe: () =>
 					console.log("Error prompt subscription - nothing to unsubscribe"),
+			};
+		});
+}
+
+/**
+ * Subscribe to language changes
+ */
+export function subscribeToLanguageChanges(
+	roomId: string | number,
+	callback: (language: string) => void
+) {
+	console.log(`Setting up language subscription for room ${roomId}`);
+
+	return getRoom(roomId)
+		.then((room) => {
+			if (!room) {
+				console.error(
+					`Cannot subscribe to language - room not found with ID: ${roomId}`
+				);
+				return {
+					unsubscribe: () =>
+						console.log("No language subscription to unsubscribe from"),
+				};
+			}
+
+			const actualId = room.id;
+			console.log(
+				`Starting real-time language subscription for room ID: ${actualId}`
+			);
+
+			return supabase
+				.channel(`room-language-changes:${actualId}`)
+				.on(
+					"postgres_changes",
+					{
+						event: "UPDATE", // Only interested in updates for language
+						schema: "public",
+						table: "rooms",
+						filter: `id=eq.${actualId}`,
+					},
+					(payload: any) => {
+						console.log("Language update received, payload:", payload);
+						if (!payload.new) {
+							console.error("Invalid payload received for language update");
+							return;
+						}
+						const room = payload.new as Room;
+						callback(room.language || ""); // Assuming 'language' is a field in your Room model
+					}
+				)
+				.subscribe((status: { event: string; status: string }) => {
+					console.log(`Language subscription status for room ${actualId}:`, status);
+				});
+		})
+		.catch((err) => {
+			console.error("Error setting up language subscription:", err);
+			return {
+				unsubscribe: () =>
+					console.log("Error language subscription - nothing to unsubscribe"),
 			};
 		});
 }

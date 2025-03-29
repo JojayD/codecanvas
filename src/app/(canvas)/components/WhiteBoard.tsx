@@ -45,6 +45,9 @@ const WhiteBoard = () => {
 		version: 1,
 		lastUpdated: new Date().toISOString(),
 	});
+	const [roomIdWhiteboard, setRoomIdWhiteboard] = useState<
+		string | number | null
+	>(null);
 	const [loading, setLoading] = useState(true);
 	const isLocalChange = useRef(true);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -65,7 +68,8 @@ const WhiteBoard = () => {
 	// Load and subscribe to whiteboard
 	useEffect(() => {
 		let subscription: any = null;
-
+		const roomIdString = roomId?.toString() || "";
+		setRoomIdWhiteboard(roomIdString);
 		const loadWhiteboard = async () => {
 			try {
 				setLoading(true);
@@ -73,7 +77,7 @@ const WhiteBoard = () => {
 				// Refresh auth before loading whiteboard
 				await refreshAuth();
 
-				const whiteboard = await getWhiteboard(roomId);
+				const whiteboard = await getWhiteboard(roomIdString);
 
 				if (whiteboard) {
 					setWhiteboardId(whiteboard.id);
@@ -371,17 +375,6 @@ const WhiteBoard = () => {
 				draggable: true,
 			};
 			handleAddShape(newCircle);
-		} else if (tool === "text") {
-			const newText: Omit<KonvaShape, "id"> = {
-				type: "text",
-				x: pos.x,
-				y: pos.y,
-				text: "Double click to edit",
-				fontSize: 16,
-				fill: "#000",
-				draggable: true,
-			};
-			handleAddShape(newText);
 		}
 	};
 
@@ -592,31 +585,6 @@ const WhiteBoard = () => {
 					}}
 				/>
 			);
-		} else if (shape.type === "text") {
-			return (
-				<Text
-					key={shape.id}
-					id={shape.id}
-					x={shape.x}
-					y={shape.y}
-					text={shape.text}
-					fontSize={shape.fontSize}
-					fill={shape.fill}
-					draggable={shape.draggable}
-					onClick={() => setSelectedId(shape.id)}
-					onTap={() => setSelectedId(shape.id)}
-					onDragEnd={(e) => {
-						handleUpdateShape(shape.id, {
-							x: e.target.x(),
-							y: e.target.y(),
-						});
-					}}
-					onDblClick={(e) => {
-						const text = prompt("Enter new text:", shape.text) || shape.text;
-						handleUpdateShape(shape.id, { text });
-					}}
-				/>
-			);
 		}
 
 		return null;
@@ -659,12 +627,7 @@ const WhiteBoard = () => {
 					>
 						Line
 					</button>
-					<button
-						className={`px-2 py-1 text-xs rounded ${tool === "text" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
-						onClick={() => setTool("text")}
-					>
-						Text
-					</button>
+
 					<button
 						className={`px-2 py-1 text-xs rounded ${tool === "eraser" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
 						onClick={() => setTool("eraser")}

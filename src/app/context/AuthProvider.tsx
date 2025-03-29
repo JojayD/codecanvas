@@ -50,7 +50,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	const refreshAuth = async (): Promise<boolean> => {
 		try {
 			const result = await checkAndRefreshAuth();
-			console.log("Auth refresh result:", result);
 
 			if (result.isValid && result.session) {
 				// Update the session after refresh
@@ -107,7 +106,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			data: { subscription },
 		} = supabase.auth.onAuthStateChange(
 			async (event: any, currentSession: any) => {
-				console.log("Auth state changed:", event);
 
 				if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
 					setSession(currentSession);
@@ -169,7 +167,6 @@ export function withAuthProtection<P extends object>(
 		useEffect(() => {
 			const timer = setTimeout(() => {
 				if (loading || isRefreshing) {
-					console.log("Authentication timeout reached - force rendering component");
 					setForceRender(true);
 				}
 			}, 5000); // 5 second timeout

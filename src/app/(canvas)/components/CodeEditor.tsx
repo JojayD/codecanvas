@@ -35,6 +35,7 @@ const CodeEditor = ({
 	const [saveStatus, setSaveStatus] = useState<
 		"idle" | "saving" | "saved" | "error"
 	>("idle");
+	
 
 	// Use the auth context instead of managing session directly
 	const { session, error: authContextError, refreshAuth } = useAuth();

@@ -23,12 +23,17 @@ export default function Dashboard() {
 			const userName = await getUserName();
 			const userId = await getUserId();
 
+			// Generate a larger random ID for better security (6-8 digits)
+			const randomRoomId = Math.floor(100000 + Math.random() * 90000000);
+
 			const roomData = {
+				roomId: randomRoomId, // Explicitly set the random roomId
 				name: userName || "New Room",
 				description: "A new collaborative coding room",
 				code: "// Start coding here...",
 				participants: [],
 				prompt: "",
+				language: "javascript", // Default language
 				created_at: new Date().toISOString(),
 				created_by: userId || undefined,
 			};
@@ -39,7 +44,8 @@ export default function Dashboard() {
 
 			if (newRoom) {
 				console.log("Room created successfully:", newRoom);
-				router.push(`/canvas?roomId=${newRoom.id}`);
+				// Use the roomId field (random number) for the URL instead of the database ID
+				router.push(`/canvas?roomId=${newRoom.roomId}`);
 			} else {
 				setError("Failed to create room. Please try again.");
 			}
@@ -71,7 +77,7 @@ export default function Dashboard() {
 	return (
 		<div className='min-h-screen flex flex-col p-4'>
 			<div className='flex justify-end mb-4'>
-				<Button onClick={handleLogout}>Logout</Button>
+				<Button className="bg-red-600 text-white" onClick={handleLogout}>Logout</Button>
 			</div>
 
 			<div className='flex flex-col items-center justify-center flex-grow'>
@@ -90,7 +96,7 @@ export default function Dashboard() {
 						<div>
 							<Button
 								onClick={createNewRoom}
-								className='w-full py-2'
+								className='w-full py-2 bg-blue-500 text-white'
 								disabled={loading}
 							>
 								{loading ? "Creating..." : "Create New Room"}
@@ -108,7 +114,7 @@ export default function Dashboard() {
 
 						<div className='space-y-4'>
 							<div>
-								<Label htmlFor='roomId'>Join Existing Room</Label>
+								<Label className="p-2" htmlFor='roomId'>Join Existing Room</Label>
 								<Input
 									id='roomId'
 									placeholder='Enter Room ID'
@@ -119,7 +125,7 @@ export default function Dashboard() {
 							<Button
 								onClick={joinExistingRoom}
 								variant='outline'
-								className='w-full'
+								className='w-full bg-blue-500 text-white'
 							>
 								Join Room
 							</Button>

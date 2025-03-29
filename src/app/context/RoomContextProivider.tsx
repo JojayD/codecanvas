@@ -16,23 +16,26 @@ import {
 	subscribeToRoom,
 	subscribeToCodeChanges,
 	subscribeToPromptChanges,
+	subscribeToLanguageChanges,
 } from "@/lib/supabaseRooms";
 import { Room, Room as SupabaseRoom } from "@/lib/supabase";
 
 type Participant = { userId: string; username: string };
-type RoomContextType = {
-	roomId: string;
+interface RoomContextType {
+	roomId: string | number;
 	participants: Participant[];
 	code: string;
 	prompt: string;
-	updateCode: (newCode: string) => Promise<void>;
-	updatePrompt: (newPrompt: string) => Promise<void>;
+	language: string;
+	updateCode: (code: string) => Promise<void>;
+	updatePrompt: (prompt: string) => Promise<void>;
+	updateLanguage: (language: string) => Promise<void>;
 	joinRoom: () => Promise<void>;
 	leaveRoom: () => Promise<void>;
 	loading: boolean;
 	error: Error | null;
 	currentUser: { userId: string; username: string };
-};
+}
 
 const RoomContext = createContext<RoomContextType | null>(null);
 
@@ -49,16 +52,23 @@ export const RoomProvider: React.FC<{
 	roomId: string | number;
 }> = ({ children, roomId }) => {
 	const searchParams = useSearchParams();
-	const roomIdFromParams = searchParams.get("roomId") || "";
+	// Convert the roomId parameter to a number if it's a string
+	const roomIdFromParams =
+		typeof roomId === "string"
+			? // Parse as integer, or use original value if parsing fails
+				isNaN(parseInt(roomId))
+				? roomId
+				: parseInt(roomId)
+			: roomId;
 
 	const [room, setRoom] = useState<Room | null>(null);
 	const [code, setCode] = useState<string>("");
 	const [prompt, setPrompt] = useState<string>("");
 	const [participants, setParticipants] = useState<Participant[]>([]);
-	const [loading, setLoading] = useState<boolean>(true);
+	const [language, setLanguage] = useState<string>("javascript");
+	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<Error | null>(null);
-	const [hasJoined, setHasJoined] = useState<boolean>(false);
-
+	const [hasJoined, setHasJoined] = useState(false);
 	// Mock user for now - in a real app, this would come from auth
 	// Use a stable user ID for testing multiple tabs/windows
 	const [currentUser] = useState(() => {
@@ -91,7 +101,6 @@ export const RoomProvider: React.FC<{
 
 			try {
 				setLoading(true);
-				console.log("Fetching room data for:", roomIdFromParams);
 				const roomData = await getRoom(roomIdFromParams);
 
 				if (roomData) {
@@ -244,6 +253,14 @@ export const RoomProvider: React.FC<{
 				console.error("Failed to setup prompt subscription:", error);
 			});
 
+		const languageSubscription = subscribeToLanguageChanges(
+			roomIdFromParams,
+			(updatedLanguage) => {
+				console.log("Language update received from Supabase:", updatedLanguage);
+				setLanguage(updatedLanguage);
+			}
+		);
+
 		// Set up polling as a fallback for real-time updates
 		// This will refresh room data every 5 seconds in case real-time updates fail
 		// const pollingInterval = setInterval(async () => {
@@ -334,6 +351,45 @@ export const RoomProvider: React.FC<{
 			setError(error instanceof Error ? error : new Error("Failed to leave room"));
 		}
 	}, [roomIdFromParams, currentUser.userId, hasJoined]);
+
+	// Update language function - memoized with useCallback
+	const updateLanguageInDatabase = useCallback(
+		async (newLanguage: string) => {
+			try {
+				// Generate a unique change ID
+				const changeId = Date.now().toString();
+
+				// Set the local state immediately for a responsive UI
+				setLanguage(newLanguage);
+
+				// Record that we just made a local update
+				lastLocalUpdate.current = {
+					...lastLocalUpdate.current,
+					timestamp: Date.now(),
+					changeId,
+				};
+
+				console.log("Sending language update to Supabase:", {
+					language: newLanguage,
+					changeId,
+				});
+
+				// Update the language in Supabase
+				const result = await updateRoom(roomIdFromParams, {
+					language: newLanguage,
+				});
+				if (!result) {
+					console.error("Failed to update language in Supabase");
+				}
+			} catch (error) {
+				console.error("Error updating language:", error);
+				setError(
+					error instanceof Error ? error : new Error("Failed to update language")
+				);
+			}
+		},
+		[roomIdFromParams]
+	);
 
 	// Update code function - memoized with useCallback
 	const updateCode = useCallback(
@@ -440,8 +496,10 @@ export const RoomProvider: React.FC<{
 				participants,
 				code,
 				prompt,
+				language,
 				updateCode,
 				updatePrompt,
+				updateLanguage: updateLanguageInDatabase,
 				joinRoom,
 				leaveRoom,
 				loading,

@@ -1,6 +1,5 @@
 import { supabase } from "./supabaseClient";
 
-
 export interface Room {
 	id: string;
 	roomId?: number;
@@ -13,8 +12,8 @@ export interface Room {
 	participants?: string[];
 	createdAt?: string;
 	createdBy?: string;
+	language?: string;
 }
-
 
 export interface KonvaShape {
 	id: string;
@@ -35,23 +34,20 @@ export interface KonvaShape {
 	scaleY?: number;
 }
 
-
 export interface WhiteboardContent {
 	shapes: KonvaShape[];
 	version: number;
 	lastUpdated: string;
 }
 
-
 export interface Whiteboard {
-	id: string; 
-	room_id: number; 
-	content: string; 
+	id: string;
+	room_id: number;
+	content: string;
 	created_at?: string;
 	updated_at?: string;
-	user_id?: string; 
+	user_id?: string;
 }
-
 
 export interface CreateRoomPayload {
 	id?: string;
@@ -63,8 +59,8 @@ export interface CreateRoomPayload {
 	prompt: string;
 	created_at: string;
 	created_by?: string;
+	language?: string;
 }
-
 
 export interface UpdateRoomPayload {
 	name?: string;
@@ -72,6 +68,7 @@ export interface UpdateRoomPayload {
 	description?: string;
 	code?: string;
 	prompt?: string;
+	language?: string;
 	participants?: string[];
 }
 
