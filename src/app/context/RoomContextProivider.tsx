@@ -94,6 +94,28 @@ export const RoomProvider: React.FC<{
 		changeId: "",
 	});
 
+	// Add a ref to track if the user is currently typing
+	const isUserTyping = useRef(false);
+	const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+	// Function to set typing status with automatic timeout
+	const setTypingStatus = (isTyping: boolean) => {
+		isUserTyping.current = isTyping;
+
+		// Clear any existing timeout
+		if (typingTimeoutRef.current) {
+			clearTimeout(typingTimeoutRef.current);
+			typingTimeoutRef.current = null;
+		}
+
+		// Set a new timeout to clear typing status after 1.5 seconds of inactivity
+		if (isTyping) {
+			typingTimeoutRef.current = setTimeout(() => {
+				isUserTyping.current = false;
+			}, 1500);
+		}
+	};
+
 	// Fetch room data on initial load
 	useEffect(() => {
 		async function fetchRoom() {
@@ -195,12 +217,22 @@ export const RoomProvider: React.FC<{
 				lastUpdate: new Date().toISOString(),
 			});
 
+			// Skip updates if the user is actively typing
+			if (isUserTyping.current) {
+				console.log("User is actively typing - ignoring remote update");
+				return;
+			}
+
 			// Only update if this is not our own recent change and the code is different
 			const now = Date.now();
 			const timeSinceLocalUpdate = now - lastLocalUpdate.current.timestamp;
+
+			// Improve the detection of our own changes with exact content matching
 			const isOurRecentChange =
-				timeSinceLocalUpdate < 5000 && // Within last 5 seconds
-				updatedCode === lastLocalUpdate.current.code; // Same code we just sent
+				(timeSinceLocalUpdate < 5000 &&
+					updatedCode === lastLocalUpdate.current.code) || // Same code we just sent
+				(lastLocalUpdate.current.changeId &&
+					updatedCode === lastLocalUpdate.current.code); // Match by changeId
 
 			if (isOurRecentChange) {
 				console.log("Ignoring update as it's our own recent change");
@@ -253,13 +285,37 @@ export const RoomProvider: React.FC<{
 				console.error("Failed to setup prompt subscription:", error);
 			});
 
-		const languageSubscription = subscribeToLanguageChanges(
-			roomIdFromParams,
-			(updatedLanguage) => {
-				console.log("Language update received from Supabase:", updatedLanguage);
-				setLanguage(updatedLanguage);
+		// Set up language subscription
+		let languageSubscription: { unsubscribe: () => void } | null = null;
+		subscribeToLanguageChanges(roomIdFromParams, (updatedLanguage) => {
+			console.log("Language update received from Supabase:", updatedLanguage);
+
+			// Only update if this is not our own recent change
+			const now = Date.now();
+			const timeSinceLocalUpdate = now - lastLocalUpdate.current.timestamp;
+			const isOurRecentChange = timeSinceLocalUpdate < 5000;
+
+			if (isOurRecentChange) {
+				console.log(
+					"Ignoring language update as it's likely our own recent change"
+				);
+				return;
 			}
-		);
+
+			// Force a complete state update for the language
+			console.log(
+				"Updating language state with new value from remote:",
+				updatedLanguage
+			);
+			setLanguage(updatedLanguage);
+		})
+			.then((subscription) => {
+				languageSubscription = subscription;
+				console.log("Language subscription established successfully");
+			})
+			.catch((error) => {
+				console.error("Failed to setup language subscription:", error);
+			});
 
 		// Set up polling as a fallback for real-time updates
 		// This will refresh room data every 5 seconds in case real-time updates fail
@@ -302,9 +358,14 @@ export const RoomProvider: React.FC<{
 			if (roomSubscription) roomSubscription.unsubscribe();
 			if (codeSubscription) codeSubscription.unsubscribe();
 			if (promptSubscription) promptSubscription.unsubscribe();
-			// clearInterval(pollingInterval);
+			if (languageSubscription) languageSubscription.unsubscribe();
+
+			// Clean up any existing typing timeout
+			if (typingTimeoutRef.current) {
+				clearTimeout(typingTimeoutRef.current);
+			}
 		};
-	}, [roomIdFromParams, code]); // Add code as dependency to compare with incoming updates
+	}, [roomIdFromParams]); // Remove 'code' from dependency array to prevent recreating subscriptions
 
 	// Join room function - memoized with useCallback
 	const joinRoom = useCallback(async () => {
@@ -356,18 +417,21 @@ export const RoomProvider: React.FC<{
 	const updateLanguageInDatabase = useCallback(
 		async (newLanguage: string) => {
 			try {
+				// Set typing status to true when user makes changes
+				setTypingStatus(true);
+
 				// Generate a unique change ID
 				const changeId = Date.now().toString();
 
-				// Set the local state immediately for a responsive UI
-				setLanguage(newLanguage);
-
-				// Record that we just made a local update
+				// Record that we just made a local update BEFORE setting state
 				lastLocalUpdate.current = {
 					...lastLocalUpdate.current,
 					timestamp: Date.now(),
 					changeId,
 				};
+
+				// Set the local state immediately for a responsive UI
+				setLanguage(newLanguage);
 
 				console.log("Sending language update to Supabase:", {
 					language: newLanguage,
@@ -395,19 +459,22 @@ export const RoomProvider: React.FC<{
 	const updateCode = useCallback(
 		async (newCode: string) => {
 			try {
+				// Set typing status to true when user makes changes
+				setTypingStatus(true);
+
 				// Generate a unique change ID
 				const changeId = Date.now().toString();
 
-				// Set the local state immediately for a responsive UI
-				setCode(newCode);
-
-				// Record that we just made a local update
+				// Record that we just made a local update BEFORE setting state
 				lastLocalUpdate.current = {
-					...lastLocalUpdate.current, // Keep existing values
+					...lastLocalUpdate.current,
 					timestamp: Date.now(),
 					code: newCode,
 					changeId,
 				};
+
+				// Set the local state immediately for a responsive UI
+				setCode(newCode);
 
 				console.log("Sending code update to Supabase:", {
 					length: newCode.length,
@@ -434,19 +501,22 @@ export const RoomProvider: React.FC<{
 	const updatePrompt = useCallback(
 		async (newPrompt: string) => {
 			try {
+				// Set typing status to true when user makes changes
+				setTypingStatus(true);
+
 				// Generate a unique change ID
 				const changeId = Date.now().toString();
 
-				// Set the local state immediately for a responsive UI
-				setPrompt(newPrompt);
-
-				// Record that we just made a local update
+				// Record that we just made a local update BEFORE setting state (fix order)
 				lastLocalUpdate.current = {
 					...lastLocalUpdate.current,
 					timestamp: Date.now(),
 					prompt: newPrompt,
 					changeId,
 				};
+
+				// Set the local state immediately for a responsive UI
+				setPrompt(newPrompt);
 
 				console.log("Sending prompt update to Supabase:", {
 					length: newPrompt.length,

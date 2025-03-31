@@ -35,7 +35,6 @@ const CodeEditor = ({
 	const [saveStatus, setSaveStatus] = useState<
 		"idle" | "saving" | "saved" | "error"
 	>("idle");
-	
 
 	// Use the auth context instead of managing session directly
 	const { session, error: authContextError, refreshAuth } = useAuth();
@@ -45,6 +44,7 @@ const CodeEditor = ({
 	const isLocalChange = useRef(true);
 	const isUserTyping = useRef(false);
 	const lastLocalEdit = useRef({ timestamp: 0, content: "" });
+	const typingTimeoutId = useRef<NodeJS.Timeout | null>(null);
 
 	// Update code when defaultValue changes (for real-time updates)
 	useEffect(() => {
@@ -56,6 +56,14 @@ const CodeEditor = ({
 			setCode(defaultValue);
 		}
 	}, [defaultValue, code]);
+
+	// Update language when it changes from props
+	useEffect(() => {
+		if (language !== currentLang) {
+			console.log("Received language update from props:", language);
+			setCurrentLang(language);
+		}
+	}, [language]);
 
 	// Initialize document and handle auth changes
 	useEffect(() => {
@@ -211,14 +219,20 @@ const CodeEditor = ({
 			content: newValue,
 		};
 
-		// Set a timeout to mark when typing stops
-		setTimeout(() => {
+		// Clear any existing timeout
+		if (typingTimeoutId.current) {
+			clearTimeout(typingTimeoutId.current);
+		}
+
+		// Set a timeout to mark when typing stops - use longer delay (1.5s)
+		typingTimeoutId.current = setTimeout(() => {
 			const now = Date.now();
 			// If this timeout is from our most recent edit and enough time has passed
 			if (now - lastLocalEdit.current.timestamp >= 1000) {
+				console.log("User stopped typing");
 				isUserTyping.current = false;
 			}
-		}, 1100); // Just after the debounce timeout
+		}, 1500); // Longer timeout to ensure we don't process updates during typing pauses
 
 		// Only trigger onChange if this is a local change, not from props
 		if (isLocalChange.current) {
