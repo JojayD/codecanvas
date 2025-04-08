@@ -21,7 +21,7 @@ const Prompt = () => {
 			isLocalChange.current = false; // Mark this as an external change
 			setLocalPrompt(prompt || "");
 		}
-	}, [prompt, localPrompt]);
+	}, [prompt]); // Remove localPrompt to prevent circular updates
 
 	// Debounced function for updating the prompt in Supabase
 	const debouncedUpdatePrompt = useRef(

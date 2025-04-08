@@ -76,10 +76,14 @@ export const RoomProvider: React.FC<{
 		let userId = localStorage.getItem("userId");
 		let username = localStorage.getItem("username");
 
-		if (!userId || !username) {
+		if (!userId) {
 			userId = `user-${Math.random().toString(36).substring(2, 7)}`;
-			username = `User-${Math.random().toString(36).substring(2, 5)}`;
 			localStorage.setItem("userId", userId);
+		}
+
+		// If no username is set, use a default one
+		if (!username) {
+			username = `User-${Math.random().toString(36).substring(2, 5)}`;
 			localStorage.setItem("username", username);
 		}
 
@@ -272,8 +276,9 @@ export const RoomProvider: React.FC<{
 				return;
 			}
 
-			// Force a complete state update for the prompt
-			if (typeof updatedPrompt === "string" && updatedPrompt !== prompt) {
+			// Force a complete state update for the prompt, even if content looks the same
+			// This ensures deletions are properly synchronized
+			if (typeof updatedPrompt === "string") {
 				console.log("Updating prompt state with new value from remote");
 				setPrompt(updatedPrompt);
 			}
