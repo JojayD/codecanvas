@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,15 +14,27 @@ export default function Dashboard() {
 	const [roomIdInput, setRoomIdInput] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
+	const [userName, setUserName] = useState("");
+	useEffect(() => {}, []);
+
+	const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setUserName(e.target.value); // Provide a default value if null
+	};
 
 	const createNewRoom = async () => {
 		try {
 			setLoading(true);
 			setError("");
 
-			const userName = await getUserName();
-			const userId = await getUserId();
+			if (!userName.trim()) {
+				setError("Please enter a username");
+				return;
+			}
 
+			// Save username to localStorage
+			localStorage.setItem("username", userName);
+
+			const userId = await getUserId();
 			// Generate a larger random ID for better security (6-8 digits)
 			const randomRoomId = Math.floor(100000 + Math.random() * 90000000);
 
@@ -62,6 +74,12 @@ export default function Dashboard() {
 			setError("Please enter a room ID");
 			return;
 		}
+		if (!userName.trim()) {
+			setError("Please enter a username");
+			return;
+		}
+		// Save username to localStorage
+		localStorage.setItem("username", userName);
 		router.push(`/canvas?roomId=${roomIdInput.trim()}`);
 	};
 
@@ -74,10 +92,23 @@ export default function Dashboard() {
 		}
 	};
 
+	// Add useEffect to load username from localStorage on component mount
+	useEffect(() => {
+		const savedUsername = localStorage.getItem("username");
+		if (savedUsername) {
+			setUserName(savedUsername);
+		}
+	}, []);
+
 	return (
 		<div className='min-h-screen flex flex-col p-4'>
 			<div className='flex justify-end mb-4'>
-				<Button className="bg-red-600 text-white" onClick={handleLogout}>Logout</Button>
+				<Button
+					className='bg-red-600 text-white'
+					onClick={handleLogout}
+				>
+					Logout
+				</Button>
 			</div>
 
 			<div className='flex flex-col items-center justify-center flex-grow'>
@@ -91,6 +122,20 @@ export default function Dashboard() {
 							{error}
 						</div>
 					)}
+					<div className='flex flex-col gap-2 mb-3'>
+						<Label
+							className='p-2'
+							htmlFor='username'
+						>
+							Username
+						</Label>
+						<Input
+							id='username'
+							placeholder='Set username'
+							value={userName}
+							onChange={handleUserNameChange}
+						/>
+					</div>
 
 					<div className='space-y-6'>
 						<div>
@@ -114,10 +159,15 @@ export default function Dashboard() {
 
 						<div className='space-y-4'>
 							<div>
-								<Label className="p-2" htmlFor='roomId'>Join Existing Room</Label>
+								<Label
+									className='p-2'
+									htmlFor='roomId'
+								>
+									Join Existing Room
+								</Label>
 								<Input
 									id='roomId'
-									placeholder='Enter Room ID'
+									placeholder='Add room id to join'
 									value={roomIdInput}
 									onChange={(e) => setRoomIdInput(e.target.value)}
 								/>

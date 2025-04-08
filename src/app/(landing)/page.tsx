@@ -8,7 +8,7 @@ import Image from "next/image";
 export default function Home() {
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(true);
-
+	
 	useEffect(() => {
 		// Check current auth status when component mounts
 		const checkUser = async () => {
