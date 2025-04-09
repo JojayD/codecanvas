@@ -15,7 +15,6 @@ export async function createWhiteboard(
 	creatorId?: string
 ): Promise<Whiteboard | null> {
 	try {
-		// Convert roomId to number if it's a string to match the database type
 		const parsedRoomId = typeof roomId === "string" ? parseInt(roomId) : roomId;
 
 		console.log(

@@ -1,3 +1,4 @@
+import { log, time } from "console";
 import {
 	supabase,
 	Room,
@@ -74,6 +75,7 @@ export async function getRoom(roomId: string | number): Promise<Room | null> {
 			console.log(
 				`No room found with roomId=${roomIdNumber}, trying id field as fallback`
 			);
+
 			// Fall back to id field if roomId lookup fails
 			const altResult = await supabase
 				.from("rooms")
@@ -163,7 +165,6 @@ export async function joinRoom(
 		// Add participant and update
 		const updatedParticipants = [...participants, participantString];
 		console.log("Updating participants:", updatedParticipants);
-
 		// Use the room.roomId to ensure we use the random ID for updates
 		return await updateRoom(room.roomId || room.id, {
 			participants: updatedParticipants,
@@ -186,11 +187,12 @@ export async function leaveRoom(
 
 		// First get the current room data
 		const room = await getRoom(roomId);
+		console.log("Leave room function in supabaseRoom.ts", room);
 		if (!room) {
 			console.error("Room not found:", roomId);
 			throw new Error("Room not found");
 		}
-
+		console.log(room.participants);
 		// Ensure participants is an array
 		const participants = Array.isArray(room.participants)
 			? room.participants
@@ -200,7 +202,12 @@ export async function leaveRoom(
 		const updatedParticipants = participants.filter(
 			(p) => !p.startsWith(`${userId}:`)
 		);
-
+		let dateTime = new Date();
+		console.log(
+			"Here are the upadted participants",
+			updatedParticipants,
+			dateTime
+		);
 		console.log("Updating participants:", updatedParticipants);
 		// Use the room.roomId to ensure we use the random ID for updates
 		return await updateRoom(room.roomId || room.id, {

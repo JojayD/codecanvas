@@ -80,22 +80,44 @@ function Canvas() {
 		// Skip on first render
 		if (prevParticipantIds.length > 0) {
 			// Check if the participants have changed
-			const hasNewParticipants = currentParticipantIds.some(
+			const newParticipants = currentParticipantIds.filter(
 				(id) => !prevParticipantIds.includes(id)
 			);
-			const hasLostParticipants = prevParticipantIds.some(
+			const departedParticipants = prevParticipantIds.filter(
 				(id) => !currentParticipantIds.includes(id)
 			);
 
-			if (hasNewParticipants || hasLostParticipants) {
-				// Someone joined or left
-				setLastUpdate(`Participants updated at ${new Date().toLocaleTimeString()}`);
+			if (newParticipants.length > 0 || departedParticipants.length > 0) {
+				// Generate appropriate message based on what changed
+				let message = `Participants updated at ${new Date().toLocaleTimeString()}`;
+
+				if (newParticipants.length > 0) {
+					// Find usernames of new participants
+					const newUsernames = newParticipants.map((id) => {
+						const participant = participants.find((p) => p.userId === id);
+						return participant ? participant.username : "Unknown user";
+					});
+					message = `${newUsernames.join(", ")} joined at ${new Date().toLocaleTimeString()}`;
+				}
+
+				if (departedParticipants.length > 0) {
+					// We don't have usernames for departed users, just indicate someone left
+					message = `User${departedParticipants.length > 1 ? "s" : ""} left at ${new Date().toLocaleTimeString()}`;
+				}
+
+				console.log("Participant change detected:", {
+					newParticipants,
+					departedParticipants,
+					message,
+				});
+
+				setLastUpdate(message);
 				setShowUpdateNotification(true);
 
 				// Hide notification after 3 seconds
 				setTimeout(() => {
 					setShowUpdateNotification(false);
-				}, 3000);
+				}, 5000);
 			}
 		}
 
@@ -136,11 +158,40 @@ function Canvas() {
 
 		joinRoomNow();
 
+		// Add beforeunload event listener to handle unexpected exits
+		const handleBeforeUnload = () => {
+			console.log("Browser closing/refreshing - leaving room");
+			// Use synchronous fetch via navigator.sendBeacon to handle the cleanup
+			if (roomId && currentUser?.userId) {
+				const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}`;
+				navigator.sendBeacon(url);
+			}
+		};
+
+		window.addEventListener("beforeunload", handleBeforeUnload);
+
 		// Leave the room when component unmounts
 		return () => {
-			leaveRoom();
+			console.log("Canvas component unmounting - cleaning up");
+			window.removeEventListener("beforeunload", handleBeforeUnload);
+
+			// This will call the leaveRoom function but it's important to note
+			// that the async promise might not complete if we're navigating away
+			const leavePromise = leaveRoom();
+
+			// For navigation within the app, we can try to wait for the leave operation
+			// But this won't work for page refreshes/closes
+			try {
+				// Also use the API endpoint as a backup for more reliable leaving
+				if (roomId && currentUser?.userId) {
+					const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}`;
+					navigator.sendBeacon(url);
+				}
+			} catch (error) {
+				console.error("Error in cleanup when unmounting Canvas:", error);
+			}
 		};
-	}, [leaveRoom, joinRoom]);
+	}, [leaveRoom, joinRoom, roomId, currentUser]);
 
 	const handleLogout = async () => {
 		const { error } = await supabase.auth.signOut();
@@ -153,8 +204,23 @@ function Canvas() {
 
 	const handleLeaveRoom = async () => {
 		try {
+			console.log("User clicked Leave Room button");
+			// First, call the leaveRoom function from the context
 			await leaveRoom();
 
+			// Then as a backup, also call the API endpoint directly
+			if (roomId && currentUser?.userId) {
+				const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}`;
+				await fetch(url);
+				console.log("API leave room request completed");
+			}
+
+			// Wait a brief moment to allow Supabase to process the update
+			// before navigating away from the page
+			await new Promise((resolve) => setTimeout(resolve, 500));
+
+			// Finally, navigate to the dashboard
+			console.log("Navigating to dashboard after leaving room");
 			router.push("/dashboard");
 		} catch (error) {
 			console.error("Error leaving room:", error);
