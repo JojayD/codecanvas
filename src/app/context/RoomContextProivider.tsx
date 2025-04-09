@@ -120,6 +120,9 @@ export const RoomProvider: React.FC<{
 		}
 	};
 
+	// Add state to track intentional leaves
+	const [intentionalLeave, setIntentionalLeave] = useState(false);
+
 	// Fetch room data on initial load
 	useEffect(() => {
 		async function fetchRoom() {
@@ -204,7 +207,24 @@ export const RoomProvider: React.FC<{
 				};
 			});
 
+			// Log participants change for debugging
+			console.log("Participants updated:", {
+				previous: participants.map((p) => p.userId),
+				current: parsedParticipants.map((p) => p.userId),
+				timestamp: new Date().toISOString(),
+			});
+
 			setParticipants(parsedParticipants);
+
+			// Check if current user was removed from the room (kicked or left in another tab)
+			const isCurrentUserInRoom = parsedParticipants.some(
+				(p) => p.userId === currentUser.userId
+			);
+
+			if (hasJoined && !isCurrentUserInRoom) {
+				console.log("Current user no longer in room - updating hasJoined status");
+				setHasJoined(false);
+			}
 		})
 			.then((subscription) => {
 				roomSubscription = subscription;
@@ -409,13 +429,42 @@ export const RoomProvider: React.FC<{
 
 		try {
 			console.log("Leaving room:", roomIdFromParams);
-			await leaveRoomSupabase(roomIdFromParams, currentUser.userId);
-			console.log("Successfully left room");
-			setHasJoined(false);
+			// Mark this as an intentional leave to prevent auto-rejoin
+			setIntentionalLeave(true);
+
+			// First update in Supabase before local state to ensure consistency
+			const result = await leaveRoomSupabase(roomIdFromParams, currentUser.userId);
+
+			if (result) {
+				console.log("Successfully left room in database");
+
+				// Use functional update for setParticipants to ensure we use the latest state
+				setParticipants((prevParticipants) => {
+					const updated = prevParticipants.filter(
+						(p) => p.userId !== currentUser.userId
+					);
+					// Log the participant change for debugging
+					console.log(
+						"Local participants updated after leaving (functional update):",
+						{
+							previous: prevParticipants.map((p) => p.userId),
+							current: updated.map((p) => p.userId),
+							timestamp: new Date().toISOString(),
+						}
+					);
+					return updated; // Return the new state
+				});
+
+				setHasJoined(false);
+			} else {
+				console.error("Failed to leave room - no result returned from database");
+				throw new Error("Failed to leave room - database update failed");
+			}
 		} catch (error) {
 			console.error("Error leaving room:", error);
 			setError(error instanceof Error ? error : new Error("Failed to leave room"));
 		}
+		// Keep `participants` removed from dependency array
 	}, [roomIdFromParams, currentUser.userId, hasJoined]);
 
 	// Update language function - memoized with useCallback
@@ -546,11 +595,11 @@ export const RoomProvider: React.FC<{
 
 	// Auto-join the room when the component mounts and room data is loaded
 	useEffect(() => {
-		if (!loading && room && !hasJoined) {
+		if (!loading && room && !hasJoined && !intentionalLeave) {
 			console.log("Auto-joining room after initial load");
 			joinRoom();
 		}
-	}, [loading, room, hasJoined, joinRoom]);
+	}, [loading, room, hasJoined, joinRoom, intentionalLeave]);
 
 	// Clean up when component unmounts
 	useEffect(() => {
