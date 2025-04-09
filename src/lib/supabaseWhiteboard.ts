@@ -253,6 +253,61 @@ export async function deleteShape(
 }
 
 /**
+ * Delete whiteboard by room ID
+ */
+export async function deleteWhiteboardByRoomId(
+	roomId: string | number
+): Promise<boolean> {
+	try {
+		// Convert roomId to number if it's a string
+		const parsedRoomId = typeof roomId === "string" ? parseInt(roomId) : roomId;
+
+		console.log(
+			`ENTERING DELETION STAGE FOR WHITEBOARD of room: ${parsedRoomId}`
+		);
+
+		// First, check if a whiteboard exists for this room
+		const { data: existingWhiteboard, error: fetchError } = await supabase
+			.from("whiteboards")
+			.select("id")
+			.eq("room_id", parsedRoomId)
+			.single();
+
+		if (fetchError) {
+			if (fetchError.code === "PGRST116") {
+				// No rows returned
+				console.log(
+					`No whiteboard found for room ${parsedRoomId}, nothing to delete`
+				);
+				return true; // Consider this a success since there's nothing to delete
+			}
+			console.error(`Error checking for whiteboard: ${fetchError.message}`);
+			throw fetchError;
+		}
+
+		console.log(
+			`DELETING whiteboard for room ${parsedRoomId}, ID: ${existingWhiteboard?.id}`
+		);
+
+		const { error } = await supabase
+			.from("whiteboards")
+			.delete()
+			.eq("room_id", parsedRoomId);
+
+		if (error) {
+			console.error(`ERROR deleting whiteboard: ${error.message}`);
+			throw error;
+		}
+
+		console.log(`SUCCESSFULLY deleted whiteboard for room ${parsedRoomId}`);
+		return true;
+	} catch (error) {
+		console.error("Error deleting whiteboard:", error);
+		return false;
+	}
+}
+
+/**
  * Subscribe to whiteboard changes
  */
 export function subscribeToWhiteboardChanges(

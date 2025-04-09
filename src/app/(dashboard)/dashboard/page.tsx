@@ -48,6 +48,7 @@ export default function Dashboard() {
 				language: "javascript", // Default language
 				created_at: new Date().toISOString(),
 				created_by: userId || undefined,
+				roomStatus: true,
 			};
 
 			console.log("Creating room with data:", roomData);

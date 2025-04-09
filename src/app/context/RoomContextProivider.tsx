@@ -27,11 +27,12 @@ interface RoomContextType {
 	code: string;
 	prompt: string;
 	language: string;
+	room: Room | null;
 	updateCode: (code: string) => Promise<void>;
 	updatePrompt: (prompt: string) => Promise<void>;
 	updateLanguage: (language: string) => Promise<void>;
 	joinRoom: () => Promise<void>;
-	leaveRoom: () => Promise<void>;
+	leaveRoom: (checkForHostExit?: boolean) => Promise<void>;
 	loading: boolean;
 	error: Error | null;
 	currentUser: { userId: string; username: string };
@@ -134,6 +135,21 @@ export const RoomProvider: React.FC<{
 
 				if (roomData) {
 					console.log("Room data received:", roomData);
+					console.log("Room status check - roomStatus:", roomData.roomStatus);
+
+					// Check if the room is already closed
+					if (roomData.roomStatus === false) {
+						console.log("Room is already closed, will show alert");
+						// Show alert after a short delay
+						setTimeout(() => {
+							alert(
+								"This room has been closed by the host. You'll be redirected to the dashboard."
+							);
+						}, 1000);
+						setError(new Error("Room is closed"));
+						return;
+					}
+
 					setRoom(roomData);
 					setCode(roomData.code || "// Start coding here...");
 					setPrompt(roomData.prompt || "");
@@ -215,6 +231,30 @@ export const RoomProvider: React.FC<{
 			});
 
 			setParticipants(parsedParticipants);
+
+			// Check if room was closed by host (roomStatus is false and no participants)
+			const isRoomClosed =
+				updatedRoom.roomStatus === false ||
+				(Array.isArray(updatedRoom.participants) &&
+					updatedRoom.participants.length === 0);
+
+			if (isRoomClosed) {
+				console.log("Room was closed by host - all participants have been removed");
+				// Set hasJoined to false since everyone has been kicked out
+				setHasJoined(false);
+				// Show an alert or notification that the room was closed by host
+				if (typeof window !== "undefined") {
+					// Only show alert in browser environment
+					alert("The host has left the room. The room is now closed.");
+
+					// If the user is not on the dashboard already, redirect them
+					if (window.location.pathname.includes("/canvas")) {
+						console.log("Redirecting to dashboard due to room closure");
+						window.location.href = "/dashboard";
+					}
+				}
+				return;
+			}
 
 			// Check if current user was removed from the room (kicked or left in another tab)
 			const isCurrentUserInRoom = parsedParticipants.some(
@@ -421,51 +461,62 @@ export const RoomProvider: React.FC<{
 	}, [roomIdFromParams, currentUser, hasJoined]);
 
 	// Leave room function - memoized with useCallback
-	const leaveRoom = useCallback(async () => {
-		if (!hasJoined) {
-			console.log("Not joined this room, skipping leave");
-			return;
-		}
-
-		try {
-			console.log("Leaving room:", roomIdFromParams);
-			// Mark this as an intentional leave to prevent auto-rejoin
-			setIntentionalLeave(true);
-
-			// First update in Supabase before local state to ensure consistency
-			const result = await leaveRoomSupabase(roomIdFromParams, currentUser.userId);
-
-			if (result) {
-				console.log("Successfully left room in database");
-
-				// Use functional update for setParticipants to ensure we use the latest state
-				setParticipants((prevParticipants) => {
-					const updated = prevParticipants.filter(
-						(p) => p.userId !== currentUser.userId
-					);
-					// Log the participant change for debugging
-					console.log(
-						"Local participants updated after leaving (functional update):",
-						{
-							previous: prevParticipants.map((p) => p.userId),
-							current: updated.map((p) => p.userId),
-							timestamp: new Date().toISOString(),
-						}
-					);
-					return updated; // Return the new state
-				});
-
-				setHasJoined(false);
-			} else {
-				console.error("Failed to leave room - no result returned from database");
-				throw new Error("Failed to leave room - database update failed");
+	const leaveRoom = useCallback(
+		async (checkForHostExit: boolean = false) => {
+			if (!hasJoined) {
+				console.log("Not joined this room, skipping leave");
+				return;
 			}
-		} catch (error) {
-			console.error("Error leaving room:", error);
-			setError(error instanceof Error ? error : new Error("Failed to leave room"));
-		}
-		// Keep `participants` removed from dependency array
-	}, [roomIdFromParams, currentUser.userId, hasJoined]);
+
+			try {
+				console.log(
+					`Leaving room: ${roomIdFromParams}, checkForHostExit: ${checkForHostExit}`
+				);
+				// Mark this as an intentional leave to prevent auto-rejoin
+				setIntentionalLeave(true);
+
+				// First update in Supabase before local state to ensure consistency
+				const result = await leaveRoomSupabase(
+					roomIdFromParams,
+					currentUser.userId,
+					checkForHostExit
+				);
+
+				if (result) {
+					console.log("Successfully left room in database");
+
+					// Use functional update for setParticipants to ensure we use the latest state
+					setParticipants((prevParticipants) => {
+						const updated = prevParticipants.filter(
+							(p) => p.userId !== currentUser.userId
+						);
+						// Log the participant change for debugging
+						console.log(
+							"Local participants updated after leaving (functional update):",
+							{
+								previous: prevParticipants.map((p) => p.userId),
+								current: updated.map((p) => p.userId),
+								timestamp: new Date().toISOString(),
+							}
+						);
+						return updated; // Return the new state
+					});
+
+					setHasJoined(false);
+				} else {
+					console.error("Failed to leave room - no result returned from database");
+					throw new Error("Failed to leave room - database update failed");
+				}
+			} catch (error) {
+				console.error("Error leaving room:", error);
+				setError(
+					error instanceof Error ? error : new Error("Failed to leave room")
+				);
+			}
+			// Keep `participants` removed from dependency array
+		},
+		[roomIdFromParams, currentUser.userId, hasJoined]
+	);
 
 	// Update language function - memoized with useCallback
 	const updateLanguageInDatabase = useCallback(
@@ -604,11 +655,16 @@ export const RoomProvider: React.FC<{
 	// Clean up when component unmounts
 	useEffect(() => {
 		return () => {
-			if (hasJoined) {
+			// Skip automatic leaving during development to prevent issues during hot reloading and testing
+			const isDevelopment = process.env.NODE_ENV === "development";
+
+			if (hasJoined && !isDevelopment) {
 				console.log("Component unmounting, leaving room");
-				leaveRoomSupabase(roomIdFromParams, currentUser.userId)
+				leaveRoomSupabase(roomIdFromParams, currentUser.userId, false)
 					.then(() => console.log("Left room on unmount"))
 					.catch((err) => console.error("Error leaving room on unmount:", err));
+			} else if (isDevelopment && hasJoined) {
+				console.log("Skipping leave room on unmount in development mode");
 			}
 		};
 	}, [roomIdFromParams, currentUser.userId, hasJoined]);
@@ -621,6 +677,7 @@ export const RoomProvider: React.FC<{
 				code,
 				prompt,
 				language,
+				room,
 				updateCode,
 				updatePrompt,
 				updateLanguage: updateLanguageInDatabase,

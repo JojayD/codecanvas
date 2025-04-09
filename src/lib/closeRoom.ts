@@ -1,0 +1,76 @@
+import { supabase } from "./supabase";
+
+/**
+ * Simplified function to close a room immediately
+ * Used as a fallback in host exit scenarios
+ */
+export async function closeRoomSimple(roomId: string | number): Promise<any> {
+	try {
+		console.log(`[CLOSE_ROOM_SIMPLE] Closing room ${roomId} immediately`);
+
+		// Try to find the room first by roomId field
+		let { data: room, error: findError } = await supabase
+			.from("rooms")
+			.select("*")
+			.eq("roomId", roomId)
+			.single();
+
+		// If not found by roomId, try by id field
+		if (findError || !room) {
+			console.log(
+				`[CLOSE_ROOM_SIMPLE] Room not found by roomId ${roomId}, trying with id field`
+			);
+			const result = await supabase
+				.from("rooms")
+				.select("*")
+				.eq("id", roomId)
+				.single();
+
+			room = result.data;
+			if (result.error || !room) {
+				console.error(
+					`[CLOSE_ROOM_SIMPLE] Room not found with either roomId or id: ${roomId}`
+				);
+				return null;
+			}
+		}
+
+		console.log(`[CLOSE_ROOM_SIMPLE] Found room:`, {
+			id: room.id,
+			roomId: room.roomId,
+			participants: room.participants?.length || 0,
+		});
+
+		// Create update object - only include fields that exist in the schema
+		const updateObj = {
+			roomStatus: false,
+			participants: [],
+			updated_at: new Date().toISOString(),
+			// Remove closed_at since it doesn't exist in the schema
+			// closed_at: new Date().toISOString(),
+			// Also remove closed_by_host if it's causing issues
+			// closed_by_host: true,
+		};
+
+		console.log(`[CLOSE_ROOM_SIMPLE] Updating room with:`, updateObj);
+
+		// Update the room
+		const { data, error } = await supabase
+			.from("rooms")
+			.update(updateObj)
+			.eq("id", room.id)
+			.select()
+			.single();
+
+		if (error) {
+			console.error(`[CLOSE_ROOM_SIMPLE] Error closing room:`, error);
+			return null;
+		}
+
+		console.log(`[CLOSE_ROOM_SIMPLE] Room ${roomId} successfully closed`);
+		return data;
+	} catch (error) {
+		console.error(`[CLOSE_ROOM_SIMPLE] Unexpected error:`, error);
+		return null;
+	}
+}

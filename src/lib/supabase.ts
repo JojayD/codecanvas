@@ -12,7 +12,9 @@ export interface Room {
 	participants?: string[];
 	createdAt?: string;
 	createdBy?: string;
+	created_by?: string;
 	language?: string;
+	roomStatus?: boolean;
 }
 
 export interface KonvaShape {
@@ -60,6 +62,7 @@ export interface CreateRoomPayload {
 	created_at: string;
 	created_by?: string;
 	language?: string;
+	roomStatus?: boolean;
 }
 
 export interface UpdateRoomPayload {
@@ -70,6 +73,7 @@ export interface UpdateRoomPayload {
 	prompt?: string;
 	language?: string;
 	participants?: string[];
+	roomStatus?: boolean;
 }
 
 export { supabase };

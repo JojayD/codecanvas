@@ -44,21 +44,11 @@ function Canvas() {
 		leaveRoom,
 		loading,
 		error,
+		prompt,
 		language,
 		updateLanguage,
-	} = useRoom() as {
-		roomId: string | number;
-		code: string;
-		updateCode: (code: string) => void;
-		participants: Array<{ userId: string; username: string }>;
-		currentUser: { userId: string; username: string };
-		joinRoom: () => Promise<void>;
-		leaveRoom: () => Promise<void>;
-		loading: boolean;
-		error: Error | null;
-		language: string;
-		updateLanguage: (language: string) => Promise<void>;
-	};
+		room,
+	} = useRoom();
 
 	// Add debug state
 	const [showDebug, setShowDebug] = useState(false);
@@ -158,12 +148,41 @@ function Canvas() {
 
 		joinRoomNow();
 
+		// Set up periodic room status check as a backup for real-time updates
+		const checkRoomStatus = async () => {
+			try {
+				if (roomId) {
+					const response = await fetch(`/api/room-status?roomId=${roomId}`);
+					if (response.ok) {
+						const data = await response.json();
+						console.log("Room status check result:", data);
+
+						// If the room is marked as closed (roomStatus: false) but we haven't detected it yet
+						if (data.roomStatus === false && room?.roomStatus !== false) {
+							console.log(
+								"Room closed detected via polling - redirecting to dashboard"
+							);
+							alert(
+								"This room has been closed by the host. Redirecting to dashboard."
+							);
+							router.push("/dashboard");
+						}
+					}
+				}
+			} catch (error) {
+				console.error("Error checking room status:", error);
+			}
+		};
+
+		// Check every 10 seconds as a fallback
+		const statusCheckInterval = setInterval(checkRoomStatus, 10000);
+
 		// Add beforeunload event listener to handle unexpected exits
 		const handleBeforeUnload = () => {
 			console.log("Browser closing/refreshing - leaving room");
 			// Use synchronous fetch via navigator.sendBeacon to handle the cleanup
 			if (roomId && currentUser?.userId) {
-				const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}`;
+				const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}&checkForHostExit=false`;
 				navigator.sendBeacon(url);
 			}
 		};
@@ -175,23 +194,55 @@ function Canvas() {
 			console.log("Canvas component unmounting - cleaning up");
 			window.removeEventListener("beforeunload", handleBeforeUnload);
 
-			// This will call the leaveRoom function but it's important to note
-			// that the async promise might not complete if we're navigating away
-			const leavePromise = leaveRoom();
+			// Clear the status check interval
+			clearInterval(statusCheckInterval);
 
-			// For navigation within the app, we can try to wait for the leave operation
-			// But this won't work for page refreshes/closes
-			try {
-				// Also use the API endpoint as a backup for more reliable leaving
-				if (roomId && currentUser?.userId) {
-					const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}`;
-					navigator.sendBeacon(url);
+			// Skip automatic leaving during development to prevent issues during hot reloading and testing
+			const isDevelopment = process.env.NODE_ENV === "development";
+
+			if (!isDevelopment) {
+				// This will call the leaveRoom function but it's important to note
+				// that the async promise might not complete if we're navigating away
+				const leavePromise = leaveRoom(false); // Pass false to avoid host exit check on unmount
+
+				// For navigation within the app, we can try to wait for the leave operation
+				// But this won't work for page refreshes/closes
+				try {
+					// Also use the API endpoint as a backup for more reliable leaving
+					if (roomId && currentUser?.userId) {
+						const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}&checkForHostExit=false`;
+						navigator.sendBeacon(url);
+					}
+				} catch (error) {
+					console.error("Error in cleanup when unmounting Canvas:", error);
 				}
-			} catch (error) {
-				console.error("Error in cleanup when unmounting Canvas:", error);
+			} else {
+				console.log("Skipping leave room on unmount in development mode");
 			}
 		};
-	}, [leaveRoom, joinRoom, roomId, currentUser]);
+	}, [leaveRoom, joinRoom, roomId, currentUser, router]);
+
+	// Effect to handle room status changes and redirect if room is closed
+	useEffect(() => {
+		// If we're in the room but it's marked as closed or has no participants, redirect to dashboard
+		const isRoomClosed =
+			room?.roomStatus === false ||
+			(Array.isArray(participants) && participants.length === 0);
+
+		console.log("Room closed check:", {
+			roomStatus: room?.roomStatus,
+			participantsEmpty: Array.isArray(participants) && participants.length === 0,
+			isRoomClosed,
+		});
+
+		if (isRoomClosed && !loading) {
+			console.log("Room is closed, redirecting to dashboard");
+			// Show a message about the room being closed
+			alert("This room has been closed by the host. Redirecting to dashboard.");
+			// Navigate to dashboard after a short delay
+			router.push("/dashboard");
+		}
+	}, [room, participants, loading, router]);
 
 	const handleLogout = async () => {
 		const { error } = await supabase.auth.signOut();
@@ -204,13 +255,32 @@ function Canvas() {
 
 	const handleLeaveRoom = async () => {
 		try {
-			console.log("User clicked Leave Room button");
-			// First, call the leaveRoom function from the context
-			await leaveRoom();
+			console.log(`User clicked Leave Room button`);
 
-			// Then as a backup, also call the API endpoint directly
+			// Check if this user is likely the host
+			const isLastParticipant = participants.length <= 1;
+			const isCreator = room?.created_by === currentUser.userId;
+
+			console.log(
+				`[LEAVE] Host exit check - isLastParticipant: ${isLastParticipant}, isCreator: ${isCreator}`
+			);
+
+			// First, call the leaveRoom function from the context
+			// Pass true for checkForHostExit to indicate this is an intentional exit
+			// that should check if the user is a host
+			await leaveRoom(true);
+
+			// Then as a backup, also call the API endpoint directly with updated user ID format
 			if (roomId && currentUser?.userId) {
-				const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}`;
+				const userId = currentUser.userId;
+				// Make sure we're sending the full format with username if available
+				const fullUserId = currentUser.username
+					? `${userId}:${currentUser.username}`
+					: userId;
+
+				console.log(`[LEAVE] Calling API with userId: ${fullUserId}`);
+
+				const url = `/api/leave-room?roomId=${roomId}&userId=${encodeURIComponent(fullUserId)}&checkForHostExit=true`;
 				await fetch(url);
 				console.log("API leave room request completed");
 			}
