@@ -199,27 +199,36 @@ function Canvas() {
 			// Clear the status check interval
 			clearInterval(statusCheckInterval);
 
-			// Skip automatic leaving during development to prevent issues during hot reloading and testing
+			// Get environment mode for logging purposes
 			const isDevelopment = process.env.NODE_ENV === "development";
 
+			// Only perform leave operations (beacon and function call) in production
 			if (!isDevelopment) {
-				// This will call the leaveRoom function but it's important to note
-				// that the async promise might not complete if we're navigating away
-				const leavePromise = leaveRoom(false); // Pass false to avoid host exit check on unmount
+				console.log("[PROD] Production mode - attempting to leave room on unmount");
 
-				// For navigation within the app, we can try to wait for the leave operation
-				// But this won't work for page refreshes/closes
+				// Send beacon for reliable leaving on page close/refresh
+				if (roomId && currentUser?.userId) {
+					console.log("[PROD] Sending leave room beacon on unmount");
+					const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}&checkForHostExit=false`;
+					navigator.sendBeacon(url);
+				}
+
+				// Call leaveRoom function, but don't block excessively
 				try {
-					// Also use the API endpoint as a backup for more reliable leaving
-					if (roomId && currentUser?.userId) {
-						const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}&checkForHostExit=false`;
-						navigator.sendBeacon(url);
-					}
+					console.log("[PROD] Calling leaveRoom function with timeout");
+					Promise.race([
+						leaveRoom(false), // Pass false to avoid host exit check on unmount
+						new Promise((resolve) => setTimeout(resolve, 300)),
+					]).catch((err) => {
+						console.error("[PROD] Error in leaveRoom during unmount:", err);
+					});
 				} catch (error) {
-					console.error("Error in cleanup when unmounting Canvas:", error);
+					console.error("[PROD] Error in cleanup when unmounting Canvas:", error);
 				}
 			} else {
-				console.log("Skipping leave room on unmount in development mode");
+				console.log(
+					"[DEV] Development mode - skipping leave room operations on unmount."
+				);
 			}
 		};
 	}, [leaveRoom, joinRoom, roomId, currentUser, router]);
@@ -243,7 +252,7 @@ function Canvas() {
 			// Navigate to dashboard after a short delay
 			router.push("/dashboard");
 		}
-	}, [room, loading, router]);
+	}, [room, loading]);
 
 	const handleLogout = async () => {
 		try {
