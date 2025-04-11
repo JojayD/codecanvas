@@ -462,6 +462,17 @@ export async function handleHostExit(
 			console.log(
 				`[HOST EXIT] CLOSING ROOM: User ${userId} IS identified as the host`
 			);
+
+			// Log detailed info about why we're closing the room
+			console.log("[HOST EXIT] Closing room because:", {
+				isHost,
+				isTestHost,
+				isLastParticipant,
+				participants: participants.length,
+				userId,
+				room_created_by: room.created_by,
+			});
+
 			const closedRoom = await closeRoomSimple(room.roomId || room.id);
 
 			if (!closedRoom) {

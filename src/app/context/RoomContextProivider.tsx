@@ -507,6 +507,13 @@ export const RoomProvider: React.FC<{
 
 		try {
 			console.log("Joining room as:", currentUser);
+			console.log("[JOIN] Room state before joining:", {
+				roomId: roomIdFromParams,
+				participants: room?.participants || [],
+				currentUserId: currentUser.userId,
+				isCreator: room?.created_by === currentUser.userId,
+				timestamp: new Date().toISOString(),
+			});
 
 			const result = await joinRoomSupabase(
 				roomIdFromParams,
@@ -515,16 +522,22 @@ export const RoomProvider: React.FC<{
 			);
 
 			if (result) {
-				console.log("Successfully joined room");
+				console.log("[JOIN] Successfully joined room. Updated room state:", {
+					participants: result.participants || [],
+					participantCount: Array.isArray(result.participants)
+						? result.participants.length
+						: 0,
+					roomStatus: result.roomStatus,
+				});
 				setHasJoined(true);
 			} else {
 				console.error("Failed to join room, no result returned");
 			}
 		} catch (error) {
-			console.error("Error joining room:", error);
+			console.error("[JOIN] Error joining room:", error);
 			setError(error instanceof Error ? error : new Error("Failed to join room"));
 		}
-	}, [roomIdFromParams, currentUser, hasJoined]);
+	}, [roomIdFromParams, currentUser, hasJoined, room]);
 
 	// Function to clean up local storage when leaving room
 	const cleanupLocalStorage = () => {
