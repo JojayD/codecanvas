@@ -7,10 +7,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-export async function POST(request: NextRequest) {
+// Simplified handler pattern to avoid type issues with AWS Amplify
+export async function POST(req: NextRequest) {
 	try {
 		// Parse body for roomId and userId
-		const body = await request.json();
+		const body = await req.json();
 		const { roomId, userId, matchType } = body;
 
 		console.log("[FORCE-CLOSE] Request received:", {

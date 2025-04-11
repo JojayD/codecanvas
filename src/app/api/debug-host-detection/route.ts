@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 import { getUserId } from "@/app/utils/supabase/lib/supabaseGetUserId";
 
-export async function GET(request: NextRequest) {
+// Simplified handler pattern to avoid type issues with AWS Amplify
+export async function GET(req: NextRequest) {
 	try {
-		const searchParams = request.nextUrl.searchParams;
+		const searchParams = req.nextUrl.searchParams;
 		const roomId = searchParams.get("roomId");
 		const userId = searchParams.get("userId");
 		const created_by = searchParams.get("created_by");
