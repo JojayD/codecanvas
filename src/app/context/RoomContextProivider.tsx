@@ -9,16 +9,19 @@ import React, {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-	getRoom,
 	joinRoom as joinRoomSupabase,
 	leaveRoom as leaveRoomSupabase,
+	getRoom as getRoomSupabase,
 	updateRoom,
-	subscribeToRoom,
 	subscribeToCodeChanges,
 	subscribeToPromptChanges,
 	subscribeToLanguageChanges,
+	closeRoom as closeRoomSupabase,
 } from "@/lib/supabaseRooms";
 import { Room, Room as SupabaseRoom } from "@/lib/supabase";
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { useRouter } from "next/navigation";
+import axios from "axios";
 
 type Participant = { userId: string; username: string };
 interface RoomContextType {
@@ -62,6 +65,7 @@ export const RoomProvider: React.FC<{
 				: parseInt(roomId)
 			: roomId;
 
+	const router = useRouter();
 	const [room, setRoom] = useState<Room | null>(null);
 	const [code, setCode] = useState<string>("");
 	const [prompt, setPrompt] = useState<string>("");
@@ -87,6 +91,13 @@ export const RoomProvider: React.FC<{
 			username = `User-${Math.random().toString(36).substring(2, 5)}`;
 			localStorage.setItem("username", username);
 		}
+
+		// Log current user info for debugging host detection
+		console.log("[DEBUG USER] Current user info from localStorage:", {
+			userId,
+			username,
+			authID: localStorage.getItem("supabase.auth.token"), // Try to get Supabase auth ID if available
+		});
 
 		return { userId, username };
 	});
@@ -131,7 +142,7 @@ export const RoomProvider: React.FC<{
 
 			try {
 				setLoading(true);
-				const roomData = await getRoom(roomIdFromParams);
+				const roomData = await getRoomSupabase(roomIdFromParams);
 
 				if (roomData) {
 					console.log("Room data received:", roomData);
@@ -206,7 +217,16 @@ export const RoomProvider: React.FC<{
 
 		// Set up the room subscription
 		subscribeToRoom(roomIdFromParams, (updatedRoom) => {
-			console.log("Room update received:", updatedRoom);
+			console.log("[ROOM-UPDATE] Room update received:", {
+				id: updatedRoom.id,
+				roomId: updatedRoom.roomId,
+				timestamp: new Date().toISOString(),
+			});
+
+			// Store previous participants for comparison
+			const previousParticipantIds = participants.map((p) => p.userId);
+
+			// Important: Update the room state with the latest data first
 			setRoom(updatedRoom);
 
 			// Ensure participants is an array
@@ -223,14 +243,50 @@ export const RoomProvider: React.FC<{
 				};
 			});
 
+			// Get current participant IDs for comparison
+			const currentParticipantIds = parsedParticipants.map((p) => p.userId);
+
+			// Detect participants who left
+			const leftParticipants = previousParticipantIds.filter(
+				(id) => !currentParticipantIds.includes(id)
+			);
+
+			// Detect participants who joined
+			const joinedParticipants = currentParticipantIds.filter(
+				(id) => !previousParticipantIds.includes(id)
+			);
+
+			// Log detailed changes if any participants joined or left
+			if (leftParticipants.length > 0 || joinedParticipants.length > 0) {
+				console.log("[ROOM-UPDATE] 🚨 PARTICIPANT CHANGE DETECTED 🚨", {
+					left: leftParticipants,
+					joined: joinedParticipants,
+					previous: previousParticipantIds,
+					current: currentParticipantIds,
+					timestamp: new Date().toISOString(),
+				});
+
+				// Log specific messages for each participant that left or joined
+				leftParticipants.forEach((userId) => {
+					console.log(`[ROOM-UPDATE] 👋 Participant LEFT: ${userId}`);
+				});
+
+				joinedParticipants.forEach((userId) => {
+					console.log(`[ROOM-UPDATE] 👋 Participant JOINED: ${userId}`);
+				});
+			}
+
+			// Force update the participants list with every room update
+			// This is crucial to ensure all clients see consistent state
+			setParticipants(parsedParticipants);
+
 			// Log participants change for debugging
-			console.log("Participants updated:", {
-				previous: participants.map((p) => p.userId),
-				current: parsedParticipants.map((p) => p.userId),
+			console.log("[ROOM-UPDATE] Participants updated:", {
+				previous: previousParticipantIds,
+				current: currentParticipantIds,
+				currentCount: currentParticipantIds.length,
 				timestamp: new Date().toISOString(),
 			});
-
-			setParticipants(parsedParticipants);
 
 			// Check if room was closed by host (roomStatus is false and no participants)
 			const isRoomClosed =
@@ -439,6 +495,16 @@ export const RoomProvider: React.FC<{
 			return;
 		}
 
+		if (participants.length >= 2) {
+			console.log("Room already has 2 participants, cannot join");
+			alert(
+				"This room is already full (maximum 2 participants). You will be redirected to the dashboard."
+			);
+			// Use Next.js navigation approach since we're in a Next.js app
+			window.location.href = "/dashboard";
+			return;
+		}
+
 		try {
 			console.log("Joining room as:", currentUser);
 
@@ -460,62 +526,162 @@ export const RoomProvider: React.FC<{
 		}
 	}, [roomIdFromParams, currentUser, hasJoined]);
 
+	// Function to clean up local storage when leaving room
+	const cleanupLocalStorage = () => {
+		localStorage.removeItem("userId");
+		localStorage.removeItem("username");
+	};
+
 	// Leave room function - memoized with useCallback
 	const leaveRoom = useCallback(
-		async (checkForHostExit: boolean = false) => {
-			if (!hasJoined) {
-				console.log("Not joined this room, skipping leave");
-				return;
-			}
-
+		async (checkForHostExit: boolean = true, refresh: boolean = true) => {
 			try {
-				console.log(
-					`Leaving room: ${roomIdFromParams}, checkForHostExit: ${checkForHostExit}`
-				);
-				// Mark this as an intentional leave to prevent auto-rejoin
-				setIntentionalLeave(true);
+				if (!room) {
+					return;
+				}
 
-				// First update in Supabase before local state to ensure consistency
-				const result = await leaveRoomSupabase(
-					roomIdFromParams,
-					currentUser.userId,
-					checkForHostExit
-				);
+				// Extract the correct roomId (use roomId field, not id)
+				const roomIdToUse = room.roomId || room.id;
+				console.log(`[LEAVE] Preparing to leave room ${roomIdToUse}`);
 
-				if (result) {
-					console.log("Successfully left room in database");
+				if (checkForHostExit) {
+					try {
+						// Enhanced host detection when checkForHostExit is true
 
-					// Use functional update for setParticipants to ensure we use the latest state
-					setParticipants((prevParticipants) => {
-						const updated = prevParticipants.filter(
-							(p) => p.userId !== currentUser.userId
-						);
-						// Log the participant change for debugging
+						// Get user ID (with and without username)
+						const userId = currentUser.userId;
+						const userName = currentUser.username;
+
+						// Try to get the created_by from room if available
+						const created_by = room.created_by || "";
+
+						// Call debug endpoint to check if user is host or last participant
 						console.log(
-							"Local participants updated after leaving (functional update):",
-							{
-								previous: prevParticipants.map((p) => p.userId),
-								current: updated.map((p) => p.userId),
-								timestamp: new Date().toISOString(),
-							}
+							`[LEAVE] Calling debug-host-detection for roomId: ${roomIdToUse}, userId: ${userId}`
 						);
-						return updated; // Return the new state
+						const response = await fetch(
+							`/api/debug-host-detection?roomId=${roomIdToUse}&userId=${userId}${created_by ? `&created_by=${created_by}` : ""}`
+						);
+
+						if (!response.ok) {
+							console.error(
+								`[LEAVE] Host detection API error: ${response.status} ${response.statusText}`
+							);
+							// Fall back to basic leave without host check if endpoint fails
+							throw new Error(`Failed to check host status: ${response.statusText}`);
+						}
+
+						const data = await response.json();
+						console.log("[LEAVE] Host detection results:", data);
+
+						// BUG FIX: Only close the room if the user is the host, not if they're just the last participant
+						if (data.isHost) {
+							// Removed the "|| data.isLastParticipant" condition
+							console.log("[LEAVE] User is host, closing room...");
+
+							// Use force-close-room API to close room
+							const closeResponse = await fetch("/api/force-close-room", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({
+									roomId: roomIdToUse,
+									userId,
+								}),
+							});
+
+							if (!closeResponse.ok) {
+								console.error(
+									`[LEAVE] Force close API error: ${closeResponse.status} ${closeResponse.statusText}`
+								);
+								throw new Error(
+									`Failed to force close room: ${closeResponse.statusText}`
+								);
+							}
+
+							const closeData = await closeResponse.json();
+							console.log("[LEAVE] Force close result:", closeData);
+
+							if (closeData.success) {
+								// Delay navigation to ensure other clients get the update
+								setTimeout(() => {
+									setRoom(null);
+									if (refresh) router.refresh();
+									router.push("/dashboard");
+
+									// Clear local storage data
+									cleanupLocalStorage();
+								}, 500);
+								return; // Exit early if room closed
+							}
+						} else if (data.isLastParticipant) {
+							console.log(
+								"[LEAVE] User is last participant but not host, proceeding with normal leave"
+							);
+						}
+					} catch (error) {
+						console.error("[LEAVE] Error in host exit check:", error);
+						// Continue with normal leave procedure if host check fails
+					}
+				}
+
+				// Standard leave procedure if not host or host check fails
+				console.log("[LEAVE] Executing standard leave procedure for non-host");
+
+				// CRITICAL FIX: Use the leave-room API endpoint and wait for response
+				// before navigating away
+				try {
+					// Mark that this is an intentional leave to prevent auto-join
+					setIntentionalLeave(true);
+
+					// Call the leave-room API endpoint with the correct path format
+					console.log(
+						`[LEAVE] POST to /api/leave-room/${roomIdToUse} with userId: ${currentUser.userId}`
+					);
+
+					const response = await fetch(`/api/leave-room/${roomIdToUse}`, {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							userId: currentUser.userId,
+							checkForHostExit: false, // Explicitly indicate non-host leave
+						}),
 					});
 
-					setHasJoined(false);
-				} else {
-					console.error("Failed to leave room - no result returned from database");
-					throw new Error("Failed to leave room - database update failed");
+					if (!response.ok) {
+						throw new Error(
+							`Leave room API error: ${response.status} ${response.statusText}`
+						);
+					}
+
+					const data = await response.json();
+					console.log("[LEAVE] Leave room API response:", data);
+
+					// IMPORTANT: Add a delay to allow real-time updates to propagate
+					// This is crucial for the host to receive the update before this user leaves
+					console.log(
+						"[LEAVE] Waiting 1000ms to allow real-time updates to propagate..."
+					);
+					await new Promise((resolve) => setTimeout(resolve, 1000));
+
+					// Now navigate away
+					setRoom(null);
+					if (refresh) router.refresh();
+					router.push("/dashboard");
+
+					// Clear local storage data
+					cleanupLocalStorage();
+				} catch (error) {
+					console.error("[LEAVE] Error during leave room procedure:", error);
+					// Even on error, try to navigate away
+					setRoom(null);
+					if (refresh) router.refresh();
+					router.push("/dashboard");
 				}
 			} catch (error) {
-				console.error("Error leaving room:", error);
-				setError(
-					error instanceof Error ? error : new Error("Failed to leave room")
-				);
+				console.error("[LEAVE] Error in leaveRoom function:", error);
 			}
-			// Keep `participants` removed from dependency array
 		},
-		[roomIdFromParams, currentUser.userId, hasJoined]
+		[room, currentUser, router]
 	);
 
 	// Update language function - memoized with useCallback
@@ -660,14 +826,14 @@ export const RoomProvider: React.FC<{
 
 			if (hasJoined && !isDevelopment) {
 				console.log("Component unmounting, leaving room");
-				leaveRoomSupabase(roomIdFromParams, currentUser.userId, false)
+				leaveRoom(true, false)
 					.then(() => console.log("Left room on unmount"))
 					.catch((err) => console.error("Error leaving room on unmount:", err));
 			} else if (isDevelopment && hasJoined) {
 				console.log("Skipping leave room on unmount in development mode");
 			}
 		};
-	}, [roomIdFromParams, currentUser.userId, hasJoined]);
+	}, [roomIdFromParams, currentUser.userId, hasJoined, leaveRoom]);
 
 	return (
 		<RoomContext.Provider
@@ -692,3 +858,71 @@ export const RoomProvider: React.FC<{
 		</RoomContext.Provider>
 	);
 };
+
+// Define the subscribeToRoom function locally since it doesn't exist
+async function subscribeToRoom(
+	roomId: string | number,
+	callback: (room: Room) => void
+) {
+	console.log(
+		`[SUBSCRIPTION] Setting up room subscription for roomId: ${roomId}`
+	);
+
+	// Get room info to determine the internal DB ID
+	const room = await getRoomSupabase(roomId);
+	if (!room) {
+		console.error(
+			`[SUBSCRIPTION] Cannot subscribe - room not found with roomId: ${roomId}`
+		);
+		throw new Error(`Room not found: ${roomId}`);
+	}
+
+	// Use the room ID for the subscription
+	const dbId = room.id;
+	console.log(
+		`[SUBSCRIPTION] Found room with database ID: ${dbId}, setting up real-time channel`
+	);
+
+	// Set up the real-time subscription
+	const subscription = supabase
+		.channel(`room:${dbId}`)
+		.on(
+			"postgres_changes",
+			{
+				event: "UPDATE",
+				schema: "public",
+				table: "rooms",
+				filter: `id=eq.${dbId}`,
+			},
+			(payload) => {
+				console.log(
+					`[SUBSCRIPTION] Room update event received for room ${roomId}:`,
+					{
+						eventType: payload.eventType,
+						timestamp: new Date().toISOString(),
+						participants: (payload.new as Room).participants,
+						oldParticipants: (payload.old as any)?.participants, // May not be available in all events
+					}
+				);
+
+				const updatedRoom = payload.new as Room;
+				callback(updatedRoom);
+			}
+		)
+		.subscribe((status) => {
+			console.log(
+				`[SUBSCRIPTION] Subscription status for room ${roomId}: ${status}`
+			);
+		});
+
+	console.log(
+		`[SUBSCRIPTION] Subscription established for room ${roomId} (DB ID: ${dbId})`
+	);
+
+	return {
+		unsubscribe: () => {
+			console.log(`[SUBSCRIPTION] Unsubscribing from room ${roomId}`);
+			subscription.unsubscribe();
+		},
+	};
+}

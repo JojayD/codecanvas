@@ -6,7 +6,7 @@ import { RoomProvider, useRoom } from "@/app/context/RoomContextProivider";
 import { SplitPane } from "@rexxars/react-split-pane";
 import dynamic from "next/dynamic";
 import Prompt from "../components/Prompt";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 import React from "react";
 import { withAuthProtection } from "@/app/context/AuthProvider";
 
@@ -34,8 +34,14 @@ const DynamicWhiteBoard = dynamic(
 
 function Canvas() {
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const roomIdParam = searchParams.get("roomId");
+	const roomIdString = roomIdParam || "";
+	const roomId = roomIdString;
+	const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+	const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
 	const {
-		roomId,
 		code,
 		updateCode,
 		participants,
@@ -49,14 +55,6 @@ function Canvas() {
 		updateLanguage,
 		room,
 	} = useRoom();
-
-	// Add debug state
-	const [showDebug, setShowDebug] = useState(false);
-	const [roomIdString, setRoomIdString] = useState<string>("");
-
-	// Add state for update notifications
-	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
-	const [showUpdateNotification, setShowUpdateNotification] = useState(false);
 
 	// Track previous participants to detect changes
 	const prevParticipantsRef = React.useRef<string[]>([]);
@@ -115,23 +113,11 @@ function Canvas() {
 		prevParticipantsRef.current = currentParticipantIds;
 	}, [participants]);
 
-	useEffect(() => {
-		setRoomIdString(roomId?.toString() || "");
-	}, [roomId]);
-
 	// Handle code updates
 	useEffect(() => {
 		// Skip on first render (useRef would be cleaner but this works too)
 		if (lastUpdate !== null) {
 			setLastUpdate(`Code updated at ${new Date().toLocaleTimeString()}`);
-			// setShowUpdateNotification(true);
-
-			// Hide notification after 3 seconds
-			// setTimeout(() => {
-			// setShowUpdateNotification(false);
-			// }, 3000);
-			// } else {
-			// Initialize on first render
 			setLastUpdate(`Session started at ${new Date().toLocaleTimeString()}`);
 		}
 	}, [code]);
@@ -245,11 +231,33 @@ function Canvas() {
 	}, [room, participants, loading, router]);
 
 	const handleLogout = async () => {
-		const { error } = await supabase.auth.signOut();
-		if (error) {
-			console.error("Error signing out:", error.message);
-		} else {
-			router.push("/");
+		try {
+			// Call a dedicated signout API endpoint to clear cookies properly
+			const response = await fetch("/api/auth/signout", {
+				method: "POST",
+				credentials: "include", // Important for cookies
+			});
+
+			if (!response.ok) {
+				throw new Error("Signout failed");
+			}
+
+			// Optional: Clear any local storage items that might contain user data
+			localStorage.removeItem("currentUser");
+			localStorage.removeItem("roomData");
+
+			// Navigate to the login page
+			router.push("/login");
+		} catch (error) {
+			console.error("Error signing out:", error);
+
+			// Fallback to direct Supabase signout if API fails
+			const { error: supabaseError } = await supabase.auth.signOut();
+			if (supabaseError) {
+				console.error("Supabase signout error:", supabaseError.message);
+			} else {
+				router.push("/login");
+			}
 		}
 	};
 
@@ -257,9 +265,19 @@ function Canvas() {
 		try {
 			console.log(`User clicked Leave Room button`);
 
+			// Log current user and room info for debugging
+			console.log(`[LEAVE] Current user:`, currentUser);
+			console.log(`[LEAVE] Room creator info:`, {
+				roomId,
+				created_by: room?.created_by,
+				createdBy: room?.createdBy,
+			});
+			const userId = currentUser.userId;
 			// Check if this user is likely the host
 			const isLastParticipant = participants.length <= 1;
-			const isCreator = room?.created_by === currentUser.userId;
+			const isCreator =
+				room?.created_by === currentUser.userId ||
+				room?.createdBy === currentUser.userId;
 
 			console.log(
 				`[LEAVE] Host exit check - isLastParticipant: ${isLastParticipant}, isCreator: ${isCreator}`
@@ -272,17 +290,32 @@ function Canvas() {
 
 			// Then as a backup, also call the API endpoint directly with updated user ID format
 			if (roomId && currentUser?.userId) {
+				// Send both localStorage userId and Supabase auth ID if available
+				let authUser = null;
+				try {
+					const { data } = await supabase.auth.getUser();
+					authUser = data?.user;
+					console.log("[LEAVE] Auth user:", authUser?.id);
+				} catch (e) {
+					console.log("[LEAVE] No auth user available");
+				}
+
+				// Use the complete user ID including username if available
 				const userId = currentUser.userId;
-				// Make sure we're sending the full format with username if available
-				const fullUserId = currentUser.username
-					? `${userId}:${currentUser.username}`
-					: userId;
+				const authUserId = authUser?.id;
+				console.log(`[LEAVE] Auth user ID: ${authUserId}`);
+				console.log(`[LEAVE] Calling API with userId: ${authUserId}`);
 
-				console.log(`[LEAVE] Calling API with userId: ${fullUserId}`);
+				const url = `/api/leave-room?roomId=${roomId}&authUserId=${encodeURIComponent(authUserId || "")}&checkForHostExit=true`;
+				const response = await fetch(url);
+				const data = await response.json();
 
-				const url = `/api/leave-room?roomId=${roomId}&userId=${encodeURIComponent(fullUserId)}&checkForHostExit=true`;
-				await fetch(url);
-				console.log("API leave room request completed");
+				console.log("API leave room request completed:", data);
+
+				// Check if this was a host exit
+				if (data.wasHostExit) {
+					console.log("Host exit confirmed by API - room has been closed");
+				}
 			}
 
 			// Wait a brief moment to allow Supabase to process the update
@@ -303,10 +336,6 @@ function Canvas() {
 		} catch (error) {
 			console.error("Error manually joining room:", error);
 		}
-	};
-
-	const handleDebug = () => {
-		setShowDebug(!showDebug);
 	};
 
 	if (loading)
@@ -429,15 +458,6 @@ function Canvas() {
 					>
 						Copy Invite Link
 					</button>
-					<button
-						className='bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
-						onClick={handleDebug}
-					>
-						Info
-					</button>
-					<span className='text-sm text-gray-300'>
-						Your ID: {currentUser.userId}
-					</span>
 				</div>
 			</div>
 
@@ -458,31 +478,6 @@ function Canvas() {
 			<div className='bg-gray-700 text-gray-300 px-4 py-1 text-xs'>
 				{lastUpdate || "Connecting..."}
 			</div>
-
-			{showDebug && (
-				<div className='bg-gray-900 text-white p-2 max-h-40 overflow-auto'>
-					<h3 className='font-bold'>Debug Information:</h3>
-					<p>Room ID: {roomId}</p>
-					<p>
-						Current User: {currentUser.userId} ({currentUser.username})
-					</p>
-					<p>Participants ({participants.length}):</p>
-					<ul className='pl-4'>
-						{participants.length === 0 ? (
-							<li className='text-gray-400'>No participants</li>
-						) : (
-							participants.map((p) => (
-								<li
-									key={p.userId}
-									className={p.userId === currentUser.userId ? "text-green-400" : ""}
-								>
-									{p.username} ({p.userId})
-								</li>
-							))
-						)}
-					</ul>
-				</div>
-			)}
 
 			<div
 				style={{

@@ -1,55 +1,181 @@
-// // src/app/utils/supabase/lib/supabaseClient.js
-// import { createClient } from '@supabase/supabase-js';
-//
-// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-// const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
-//
-// if (!supabaseUrl || !supabaseAnonKey) {
-//     throw new Error('Missing Supabase environment variables');
-// }
-//
-// export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-//     auth: {
-//         persistSession: true,
-//         autoRefreshToken: true,
-//         detectSessionInUrl: true,
-//     }
+// "use client";
+// import { createClient } from "@supabase/supabase-js";
+
+// // Check if we're in a browser environment
+// const isBrowser = typeof window !== "undefined";
+
+// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// // DEBUG: Log environment variable status
+// console.log("[SUPABASE DEBUG] Environment variables status:", {
+// 	hasUrl: !!supabaseUrl,
+// 	hasAnonKey: !!supabaseAnonKey,
+// 	url: supabaseUrl ? `${supabaseUrl.substring(0, 8)}...` : "undefined",
 // });
-"use client";
-// lib/supabaseClient.ts
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-// Create client with error handling
-let supabaseInstance: ReturnType<
-	typeof createClientComponentClient<any>
-> | null = null;
+// // Validate that environment variables are set
+// if (!supabaseUrl || !supabaseAnonKey) {
+// 	console.error("[SUPABASE ERROR] Missing Supabase credentials");
+// }
 
-try {
-	supabaseInstance = createClientComponentClient<any>({
-		supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-		supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-	});
+// // Create a proper Supabase client with error handling
+// export const supabase = createClient(
+// 	supabaseUrl || "https://placeholder-url.supabase.co",
+// 	supabaseAnonKey || "placeholder-key",
+// 	{
+// 		auth: {
+// 			persistSession: true,
+// 			autoRefreshToken: true,
+// 			detectSessionInUrl: true,
+// 		},
+// 	}
+// );
 
-	// Test if the client is working by accessing a property
-	if (!supabaseInstance?.auth) {
-		console.error("Supabase client created but auth is not available");
-		throw new Error("Invalid Supabase client");
-	}
-} catch (error) {
-	console.error("Failed to initialize Supabase client:", error);
-	// We'll return a mock client below
+// // Log client creation success and verify methods
+// console.log("[SUPABASE DEBUG] Client created successfully");
+// console.log("[SUPABASE DEBUG] Client initialized with methods:", {
+// 	hasFromMethod: typeof supabase.from === "function",
+// 	hasAuthMethod: typeof supabase.auth === "object",
+// 	hasChannelMethod: typeof supabase.channel === "function",
+// });
+
+// // Check and refresh authentication token
+// export async function checkAndRefreshAuth() {
+// 	try {
+// 		console.log("Checking auth status...");
+// 		const { data, error } = await supabase.auth.getSession();
+
+// 		if (error) {
+// 			console.error("Session error:", error.message);
+// 			return {
+// 				isValid: false,
+// 				message: `Session error: ${error.message}`,
+// 			};
+// 		}
+
+// 		if (!data.session) {
+// 			console.log("No active session found");
+// 			return {
+// 				isValid: false,
+// 				message: "No active session found",
+// 			};
+// 		}
+
+// 		// Always assume session is valid if we have one
+// 		console.log("Session found and appears valid");
+// 		return {
+// 			isValid: true,
+// 			session: data.session,
+// 		};
+// 	} catch (e) {
+// 		console.error("Auth check failed:", e);
+// 		return {
+// 			isValid: false,
+// 			message: `Auth check error: ${e instanceof Error ? e.message : "Unknown error"}`,
+// 		};
+// 	}
+// }
+
+// // Helper function to create a mock client
+// function createMockClient() {
+// 	console.warn(
+// 		"[SUPABASE WARNING] Using mock Supabase client - database operations will fail"
+// 	);
+// 	return {
+// 		auth: {
+// 			getSession: async () => ({ data: { session: null } }),
+// 			onAuthStateChange: () => ({
+// 				data: { subscription: { unsubscribe: () => {} } },
+// 			}),
+// 			signInWithOAuth: async () => ({
+// 				error: new Error("Supabase client not initialized"),
+// 			}),
+// 			signOut: async () => ({ error: null }),
+// 		},
+// 		from: () => ({
+// 			select: () => ({
+// 				data: null,
+// 				error: new Error("Mock client cannot perform database operations"),
+// 			}),
+// 			insert: () => ({
+// 				data: null,
+// 				error: new Error("Mock client cannot perform database operations"),
+// 			}),
+// 			update: () => ({
+// 				data: null,
+// 				error: new Error("Mock client cannot perform database operations"),
+// 			}),
+// 			delete: () => ({
+// 				data: null,
+// 				error: new Error("Mock client cannot perform database operations"),
+// 			}),
+// 			eq: () => ({
+// 				data: null,
+// 				error: new Error("Mock client cannot perform database operations"),
+// 			}),
+// 			single: () => ({
+// 				data: null,
+// 				error: new Error("Mock client cannot perform database operations"),
+// 			}),
+// 		}),
+// 		channel: () => ({
+// 			on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }),
+// 		}),
+// 	} as any;
+// }
+// supabaseClient.ts
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+	throw new Error("Missing Supabase configuration.");
 }
 
-// Export a functioning client or a mock
-export const supabase = supabaseInstance || {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 	auth: {
-		getSession: async () => ({ data: { session: null } }),
-		onAuthStateChange: () => ({
-			data: { subscription: { unsubscribe: () => {} } },
-		}),
-		signInWithOAuth: async () => ({
-			error: new Error("Supabase client not initialized"),
-		}),
-		signOut: async () => ({ error: null }),
+		persistSession: true,
+		autoRefreshToken: true,
+		detectSessionInUrl: true,
+		storageKey: "supabase.auth.token",
 	},
-};
+});
+
+// Check and refresh authentication token
+export async function checkAndRefreshAuth() {
+	try {
+		console.log("Checking auth status...");
+		const { data, error } = await supabase.auth.getSession();
+
+		if (error) {
+			console.error("Session error:", error.message);
+			return {
+				isValid: false,
+				message: `Session error: ${error.message}`,
+			};
+		}
+
+		if (!data.session) {
+			console.log("No active session found");
+			return {
+				isValid: false,
+				message: "No active session found",
+			};
+		}
+
+		// Always assume session is valid if we have one
+		console.log("Session found and appears valid");
+		return {
+			isValid: true,
+			session: data.session,
+		};
+	} catch (e) {
+		console.error("Auth check failed:", e);
+		return {
+			isValid: false,
+			message: `Auth check error: ${e instanceof Error ? e.message : "Unknown error"}`,
+		};
+	}
+}

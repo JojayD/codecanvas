@@ -1,6 +1,5 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 import { log } from "console";
-
 
 export async function getUserName(): Promise<string | null> {
 	const { data, error } = await supabase.auth.getSession();

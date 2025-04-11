@@ -2,13 +2,13 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import GoogleLoginButton from "@/components/ui/GoogleButtonSignIn";
-import { supabase } from "../../app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 import Image from "next/image";
 
 export default function Home() {
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(true);
-	
+
 	useEffect(() => {
 		// Check current auth status when component mounts
 		const checkUser = async () => {
@@ -98,7 +98,7 @@ export default function Home() {
 							<div className='pt-7 px-4 h-full overflow-hidden font-mono text-sm'>
 								<pre className='text-gray-800'>
 									<code>
-{`def greet() {
+										{`def greet() {
 		print("Welcome to Code Canvas!");
 	}
 

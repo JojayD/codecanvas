@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase } from "../app/utils/supabase/lib/supabaseClient";
 
 /**
  * Simplified function to close a room immediately
@@ -46,10 +46,6 @@ export async function closeRoomSimple(roomId: string | number): Promise<any> {
 			roomStatus: false,
 			participants: [],
 			updated_at: new Date().toISOString(),
-			// Remove closed_at since it doesn't exist in the schema
-			// closed_at: new Date().toISOString(),
-			// Also remove closed_by_host if it's causing issues
-			// closed_by_host: true,
 		};
 
 		console.log(`[CLOSE_ROOM_SIMPLE] Updating room with:`, updateObj);

@@ -1,5 +1,5 @@
 // components/GoogleLoginButton.tsx
-import { supabase } from "../../app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 import Image from "next/image";
 import { useState } from "react";
 
