@@ -2,35 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { leaveRoom, handleHostExit } from "@/lib/supabaseRooms";
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 
-// Fix: Use the correct context type for Next.js App Router
-type RouteContext = {
-	params: {
-		roomId: string;
-	};
-};
+// Define types for the request body
+interface LeaveRoomRequestBody {
+	userId?: string;
+	checkForHostExit?: boolean;
+}
 
-export async function POST(request: NextRequest, context: RouteContext) {
+// Simplified handler pattern to avoid type issues with AWS Amplify
+export async function POST(req: NextRequest) {
 	try {
-		// Get the roomId from the URL params (dynamic route)
-		const roomId = context.params.roomId;
+		// Extract roomId from URL path segments
+		const url = new URL(req.url);
+		const pathSegments = url.pathname.split("/");
+		const roomId = pathSegments[pathSegments.length - 1];
+
 		console.log(`Dynamic route handler activated for roomId: ${roomId}`);
 
-		// Get body data
-		let bodyData: {
-			userId?: string;
-			checkForHostExit?: boolean;
-		} = {};
+		// Get body data with proper typing
+		let bodyData: LeaveRoomRequestBody = {};
 
 		try {
-			bodyData = await request.json();
+			bodyData = (await req.json()) as LeaveRoomRequestBody;
 			console.log("POST body received:", bodyData);
 		} catch (e) {
 			console.error("Failed to parse POST body:", e);
 			return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 		}
 
-		// Extract user ID and host check flag
-		const { userId, checkForHostExit = false } = bodyData;
+		// Extract user ID and host check flag with safe defaults
+		const userId = bodyData.userId || "";
+		const checkForHostExit = bodyData.checkForHostExit === true;
 
 		// Validate parameters
 		if (!roomId || !userId) {
