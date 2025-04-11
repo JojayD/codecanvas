@@ -38,12 +38,15 @@ export default function Dashboard() {
 			// Generate a larger random ID for better security (6-8 digits)
 			const randomRoomId = Math.floor(100000 + Math.random() * 90000000);
 
+			// Add the creator to the participants list with proper format
+			const participantString = `${userId}:${userName}`;
+
 			const roomData = {
 				roomId: randomRoomId, // Explicitly set the random roomId
 				name: userName || "New Room",
 				description: "A new collaborative coding room",
 				code: "// Start coding here...",
-				participants: [],
+				participants: [participantString], // Add creator as first participant
 				prompt: "",
 				language: "javascript", // Default language
 				created_at: new Date().toISOString(),
