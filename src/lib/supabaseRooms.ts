@@ -567,7 +567,6 @@ export async function handleHostExit(
 				? "skipped in server"
 				: isLocalStorageCreator,
 			isTestHost,
-			isServerMatch,
 			isLastParticipant,
 			matchType: matchTracker.method,
 			matchDetails: matchTracker.details,
