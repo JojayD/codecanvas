@@ -471,6 +471,9 @@ export async function handleHostExit(
 		});
 
 		// ========== HOST DETECTION LOGIC ==========
+		// FIXED: Added a matched ID tracking to understand which check matched
+
+		const matchTracker = { method: "none", details: "no match found" };
 
 		// 1. First check: If Supabase authenticated user matches room creator
 		const isAuthUserCreator = !!(
@@ -478,6 +481,11 @@ export async function handleHostExit(
 			(room.created_by === supabaseAuthUser.id ||
 				room.createdBy === supabaseAuthUser.id)
 		);
+
+		if (isAuthUserCreator) {
+			matchTracker.method = "auth_match";
+			matchTracker.details = `Supabase auth ID ${supabaseAuthUser?.id} matched room creator ${room.created_by || room.createdBy}`;
+		}
 
 		// 2. Second check: Direct match between userId and creator
 		const isDirectMatch = !!(
@@ -487,7 +495,13 @@ export async function handleHostExit(
 			room.createdBy === baseUserId
 		);
 
-		// 3. Third check: LocalStorage userId match (only in browser)
+		if (isDirectMatch && !matchTracker.method.includes("match")) {
+			matchTracker.method = "direct_match";
+			matchTracker.details = `User ID ${userId} directly matches room creator ${room.created_by || room.createdBy}`;
+		}
+
+		// 3. Third check: LocalStorage userId match
+
 		const isLocalStorageMatch =
 			!isServerEnvironment &&
 			!!(
@@ -496,58 +510,52 @@ export async function handleHostExit(
 					room.createdBy === localStorageUserId)
 			);
 
+		if (isLocalStorageMatch && !matchTracker.method.includes("match")) {
+			matchTracker.method = "localStorage_match";
+			matchTracker.details = `LocalStorage ID ${localStorageUserId} matched room creator ${room.created_by || room.createdBy}`;
+		}
+
 		// 4. Fourth check: Check if this is a localStorage user who created the room
-		// Compare the base pattern 'user-XXXXX' with details persisted in localStorage
+		// FIXED: This was too permissive and caused false positives - make it more strict
 		const isLocalStorageCreator =
-			!isServerEnvironment &&
-			!!(
-				baseUserId === localStorageUserId &&
-				((room.created_by && !room.created_by.includes("@")) || // likely a user-XXX format
-					(room.createdBy && !room.createdBy.includes("@")))
-			); // rather than email
+			localStorageUserId &&
+			baseUserId === localStorageUserId &&
+			((room.created_by && room.created_by.startsWith("user-")) || // must be a user-XXX format
+				(room.createdBy && room.createdBy.startsWith("user-"))); // not just any non-email
+
+		if (isLocalStorageCreator && !matchTracker.method.includes("match")) {
+			matchTracker.method = "localStorage_creator";
+			matchTracker.details = `LocalStorage user pattern match: baseUserId=${baseUserId} matches localStorage=${localStorageUserId} and room creator has user- prefix`;
+		}
 
 		// 5. Check for test host users (special case)
 		const isTestHost = userId.startsWith("test-host-");
 
-		// 6. Special case for server environment
-		const isServerMatch = false; // Default to false to prevent auto-closures in deployment
-
-		if (isServerEnvironment) {
-			// In server environment, be more careful with automatic closures
-			// Only allow explicit matches, not format-based matching
-			console.log(
-				"[HOST EXIT] Server environment detected - being restrictive with auto-closures"
-			);
+		if (isTestHost) {
+			matchTracker.method = "test_host";
+			matchTracker.details = `Test host user detected: ${userId}`;
 		}
 
-		// 7. Check if this is the last participant (relevant for test hosts)
+		// 6. Check if this is the last participant (relevant for test hosts)
+
 		const participants = Array.isArray(room.participants)
 			? room.participants
 			: [];
 		const isLastParticipant = participants.length <= 1;
 
-		// Determine if this user is the host based on all checks
-		// In server environment, be more restrictive to prevent accidental closures
-		let isHost = false;
-
-		if (isServerEnvironment) {
-			// In server environment, only allow explicit matches
-			isHost = isDirectMatch;
-
-			// Don't auto-close if we're in server environment and not an explicit host match
-			if (!isHost) {
-				console.log(
-					"[HOST EXIT] Server environment detected - skipping auto-closure"
-				);
-			}
-		} else {
-			// In browser environment, use all checks
-			isHost =
-				isAuthUserCreator ||
-				isDirectMatch ||
-				isLocalStorageMatch ||
-				isLocalStorageCreator;
+		if (isLastParticipant && isTestHost) {
+			matchTracker.method += "_last_participant";
+			matchTracker.details += " and is last participant";
 		}
+
+		// Determine if this user is the host based on all checks
+		// FIXED: Made the check more explicit and precise
+		const isHost =
+			isAuthUserCreator ||
+			isDirectMatch ||
+			isLocalStorageMatch ||
+			(isLocalStorageCreator && room.created_by === localStorageUserId);
+
 
 		console.log("[HOST EXIT] Host detection results:", {
 			isAuthUserCreator,
@@ -561,14 +569,15 @@ export async function handleHostExit(
 			isTestHost,
 			isServerMatch,
 			isLastParticipant,
-			environment: isServerEnvironment ? "server" : "browser",
+			matchType: matchTracker.method,
+			matchDetails: matchTracker.details,
 			finalDecision: isHost || (isTestHost && isLastParticipant),
 		});
 
 		// If this user is the host OR a test host who is the last participant, close the room
 		if (isHost || (isTestHost && isLastParticipant)) {
 			console.log(
-				`[HOST EXIT] CLOSING ROOM: User ${userId} IS identified as the host`
+				`[HOST EXIT] CLOSING ROOM: User ${userId} IS identified as the host via ${matchTracker.method}`
 			);
 
 			// Log detailed info about why we're closing the room
@@ -579,7 +588,8 @@ export async function handleHostExit(
 				participants: participants.length,
 				userId,
 				room_created_by: room.created_by,
-				environment: isServerEnvironment ? "server" : "browser",
+				matchInfo: matchTracker,
+
 			});
 
 			const closedRoom = await closeRoomSimple(room.roomId || room.id);
@@ -593,7 +603,9 @@ export async function handleHostExit(
 			return closedRoom as Room;
 		}
 
-		console.log(`[HOST EXIT] NOT CLOSING ROOM: User ${userId} is NOT the host`);
+		console.log(
+			`[HOST EXIT] NOT CLOSING ROOM: User ${userId} is NOT the host (matchInfo: ${matchTracker.method})`
+		);
 		return null;
 	} catch (error) {
 		console.error("[HOST EXIT] Error handling host exit:", error);
