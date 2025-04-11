@@ -235,70 +235,50 @@ export const RoomProvider: React.FC<{
 
 		// Set up the room subscription
 		subscribeToRoom(roomIdFromParams, (updatedRoom) => {
-			console.log("[ROOM-UPDATE] Room update received:", {
-				id: updatedRoom.id,
+			console.log("[ROOM-UPDATE] Raw Payload Received:", {
 				roomId: updatedRoom.roomId,
+				participants: updatedRoom.participants, // Log raw participants
+				roomStatus: updatedRoom.roomStatus,
 				timestamp: new Date().toISOString(),
 			});
 
-			// Store previous participants for comparison
-			const previousParticipantIds = participants.map((p) => p.userId);
+			// Store previous participants for comparison (optional, but good for debugging)
+			const previousParticipants = [...participants]; // Shallow copy
 
 			// Important: Update the room state with the latest data first
 			setRoom(updatedRoom);
 
 			// Use the parseParticipants helper to normalize and deduplicate participants
 			const parsedParticipants = parseParticipants(updatedRoom.participants || []);
+			console.log("[ROOM-UPDATE] Parsed Participants:", parsedParticipants);
 
-			// Get current participant IDs for comparison
-			const currentParticipantIds = parsedParticipants.map((p) => p.userId);
+			// Check if the participants list actually changed
+			const participantsChanged =
+				JSON.stringify(previousParticipants) !== JSON.stringify(parsedParticipants);
 
-			// Detect participants who left
-			const leftParticipants = previousParticipantIds.filter(
-				(id) => !currentParticipantIds.includes(id)
-			);
-
-			// Detect participants who joined
-			const joinedParticipants = currentParticipantIds.filter(
-				(id) => !previousParticipantIds.includes(id)
-			);
-
-			// Log detailed changes if any participants joined or left
-			if (leftParticipants.length > 0 || joinedParticipants.length > 0) {
-				console.log("[ROOM-UPDATE] 🚨 PARTICIPANT CHANGE DETECTED 🚨", {
-					left: leftParticipants,
-					joined: joinedParticipants,
-					previous: previousParticipantIds,
-					current: currentParticipantIds,
-					timestamp: new Date().toISOString(),
+			if (participantsChanged) {
+				console.log("[ROOM-UPDATE] Participants changed. Updating state:", {
+					from: previousParticipants,
+					to: parsedParticipants,
 				});
+				setParticipants(parsedParticipants);
 
-				// Log specific messages for each participant that left or joined
-				leftParticipants.forEach((userId) => {
-					console.log(`[ROOM-UPDATE] 👋 Participant LEFT: ${userId}`);
-				});
-
-				joinedParticipants.forEach((userId) => {
-					console.log(`[ROOM-UPDATE] 👋 Participant JOINED: ${userId}`);
-				});
+				// Update hasJoined status based on the new participant list
+				const isUserStillInRoom = parsedParticipants.some(
+					(p) => p.userId === currentUser.userId
+				);
+				if (hasJoined !== isUserStillInRoom) {
+					console.log(
+						`[ROOM-UPDATE] Updating hasJoined status from ${hasJoined} to ${isUserStillInRoom}`
+					);
+					setHasJoined(isUserStillInRoom);
+				}
+			} else {
+				console.log("[ROOM-UPDATE] Participants unchanged. Skipping state update.");
 			}
 
-			// Force update the participants list with every room update
-			// This is crucial to ensure all clients see consistent state
-			setParticipants(parsedParticipants);
-
-			// Log participants change for debugging
-			console.log("[ROOM-UPDATE] Participants updated:", {
-				previous: previousParticipantIds,
-				current: currentParticipantIds,
-				currentCount: currentParticipantIds.length,
-				timestamp: new Date().toISOString(),
-			});
-
-			// Check if room was closed by host (roomStatus is false and no participants)
-			const isRoomClosed = updatedRoom.roomStatus === false;
-
-			if (isRoomClosed) {
+			// Handle room closure detected via real-time update
+			if (updatedRoom.roomStatus === false) {
 				console.log("Room was closed by host - roomStatus is false");
 				// Set hasJoined to false since everyone has been kicked out
 				setHasJoined(false);
