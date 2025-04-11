@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 
 export async function GET(request: NextRequest) {
 	try {
@@ -24,7 +22,7 @@ export async function GET(request: NextRequest) {
 		// Get room from database
 		const { data: room, error } = await supabase
 			.from("rooms")
-			.select("roomId, status, created_by, created_at")
+			.select("roomId, roomStatus, created_by, created_at")
 			.eq("roomId", roomId)
 			.single();
 
@@ -38,11 +36,11 @@ export async function GET(request: NextRequest) {
 		return NextResponse.json({
 			room: {
 				id: room.roomId,
-				status: room.status,
+				status: room.roomStatus,
 				created_by: room.created_by,
 				created_at: room.created_at,
 			},
-			isActive: room.status === "active",
+			isActive: room.roomStatus === "active",
 		});
 	} catch (error) {
 		console.error("[ROOM-STATUS] Unexpected error:", error);

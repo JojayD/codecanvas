@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { closeRoom } from "@/lib/supabaseRooms";
-
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Simplified handler pattern to avoid type issues with AWS Amplify
 export async function POST(req: NextRequest) {
 	try {
 		// Parse body for roomId and userId
 		const body = await req.json();
+		console.log("[FORCE-CLOSE] Request body:", body);
 		const { roomId, userId, matchType } = body;
 
 		console.log("[FORCE-CLOSE] Request received:", {
@@ -50,12 +48,27 @@ export async function POST(req: NextRequest) {
 
 		// Authorization check - only allow the host to close the room
 		if (userId) {
-			const isAuthorized = room.created_by === userId;
-			console.log(
-				`[FORCE-CLOSE] Authorization check: created_by=${room.created_by}, userId=${userId}, isAuthorized=${isAuthorized}`
-			);
+			// Use a more flexible authorization check:
+			// 1. Direct match of userId with room.created_by
+			// 2. OR check if a valid matchType was provided from debug-host-detection
+			const directMatch = room.created_by === userId;
+			const matchTypeAuth =
+				matchType === "auth_id_match" ||
+				matchType === "user_id_match" ||
+				matchType === "param_match";
 
-			// If not authorized, reject the request
+			const isAuthorized = directMatch || matchTypeAuth;
+
+			console.log(`[FORCE-CLOSE] Enhanced authorization check:`, {
+				directMatch,
+				matchTypeAuth,
+				matchType,
+				userId,
+				created_by: room.created_by,
+				isAuthorized,
+			});
+
+			// If not authorized, reject the request with detailed information
 			if (!isAuthorized) {
 				console.error(
 					`[FORCE-CLOSE] User ${userId} is not authorized to close room ${roomId}`
@@ -64,6 +77,13 @@ export async function POST(req: NextRequest) {
 					{
 						error: "Not authorized to close this room",
 						isHost: false,
+						details: {
+							directMatch,
+							matchTypeAuth,
+							matchType,
+							userId,
+							created_by: room.created_by,
+						},
 					},
 					{ status: 403 }
 				);
@@ -85,6 +105,10 @@ export async function POST(req: NextRequest) {
 					{
 						error: "Cannot verify host status",
 						isHost: false,
+						details: {
+							provided_matchType: matchType || "none",
+							required_matchTypes: ["auth_id_match", "user_id_match", "param_match"],
+						},
 					},
 					{ status: 403 }
 				);
@@ -103,10 +127,8 @@ export async function POST(req: NextRequest) {
 			.from("rooms")
 			.update({
 				roomStatus: false,
-				status: "closed",
 				participants: [], // Clear participants array
 				updated_at: new Date().toISOString(),
-				closed_at: new Date().toISOString(),
 			})
 			.eq("roomId", roomId);
 

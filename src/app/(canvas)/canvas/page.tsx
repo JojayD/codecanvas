@@ -56,6 +56,9 @@ function Canvas() {
 		room,
 	} = useRoom();
 
+	// Track if user has joined the room to avoid duplicate joins
+	const [hasJoinedLocally, setHasJoinedLocally] = useState(false);
+
 	// Track previous participants to detect changes
 	const prevParticipantsRef = React.useRef<string[]>([]);
 
@@ -115,7 +118,6 @@ function Canvas() {
 
 	// Handle code updates
 	useEffect(() => {
-		// Skip on first render (useRef would be cleaner but this works too)
 		if (lastUpdate !== null) {
 			setLastUpdate(`Code updated at ${new Date().toLocaleTimeString()}`);
 			setLastUpdate(`Session started at ${new Date().toLocaleTimeString()}`);
@@ -124,15 +126,29 @@ function Canvas() {
 
 	// Force join the room when component mounts
 	useEffect(() => {
+		// Track if a join is in progress or has been completed
+		let joinAttempted = false;
+
 		const joinRoomNow = async () => {
+			if (joinAttempted || hasJoinedLocally) return;
+
 			try {
+				console.log("Initial joinRoom call from Canvas component");
+				joinAttempted = true;
 				await joinRoom();
+				setHasJoinedLocally(true);
 			} catch (error) {
 				console.error("Error joining room on mount:", error);
+				joinAttempted = false; // Reset on error to allow retry
 			}
 		};
 
-		joinRoomNow();
+		// Only call joinRoom if we haven't already joined locally
+		if (!hasJoinedLocally) {
+			joinRoomNow();
+		} else {
+			console.log("Already joined room, skipping joinRoom call from Canvas");
+		}
 
 		// Set up periodic room status check as a backup for real-time updates
 		const checkRoomStatus = async () => {
@@ -210,14 +226,13 @@ function Canvas() {
 
 	// Effect to handle room status changes and redirect if room is closed
 	useEffect(() => {
-		// If we're in the room but it's marked as closed or has no participants, redirect to dashboard
-		const isRoomClosed =
-			room?.roomStatus === false ||
-			(Array.isArray(participants) && participants.length === 0);
+		// Only consider the room closed if roomStatus is explicitly set to false
+		// Don't use empty participants as a criteria for room closure
+		const isRoomClosed = room?.roomStatus === false;
 
 		console.log("Room closed check:", {
 			roomStatus: room?.roomStatus,
-			participantsEmpty: Array.isArray(participants) && participants.length === 0,
+			participantsCount: Array.isArray(participants) ? participants.length : 0,
 			isRoomClosed,
 		});
 
@@ -228,7 +243,7 @@ function Canvas() {
 			// Navigate to dashboard after a short delay
 			router.push("/dashboard");
 		}
-	}, [room, participants, loading, router]);
+	}, [room, loading, router]);
 
 	const handleLogout = async () => {
 		try {
@@ -332,7 +347,25 @@ function Canvas() {
 
 	const handleJoinRoom = async () => {
 		try {
+			// Don't try to join if already joined
+			if (hasJoinedLocally) {
+				console.log("Already joined locally, skipping manual join attempt");
+				return;
+			}
+
+			// Check if current user is already in participants list
+			const isUserInParticipants = participants.some(
+				(p) => p.userId === currentUser.userId
+			);
+			if (isUserInParticipants) {
+				console.log("User already in participants list, updating local state only");
+				setHasJoinedLocally(true);
+				return;
+			}
+
+			console.log("Manual join attempt initiated");
 			await joinRoom();
+			setHasJoinedLocally(true);
 		} catch (error) {
 			console.error("Error manually joining room:", error);
 		}

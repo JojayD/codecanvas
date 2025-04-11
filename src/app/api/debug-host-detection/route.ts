@@ -97,11 +97,18 @@ export async function GET(req: NextRequest) {
 			return parts[0];
 		});
 
+		// Check if the current user is actually in the participants list
+		const isUserParticipant = participantIds.includes(userId);
+
 		console.log(
 			`[DEBUG-HOST] Final result for ${userId}: ${isHost ? "IS HOST" : "NOT HOST"}`,
 			{
 				isLastParticipant,
+				isUserParticipant,
 				participantCount: participants.length,
+				allParticipants: participants,
+				participantIds,
+				timestamp: new Date().toISOString(),
 			}
 		);
 
@@ -109,6 +116,7 @@ export async function GET(req: NextRequest) {
 		return NextResponse.json({
 			isHost: isHost,
 			isLastParticipant: isLastParticipant,
+			isUserParticipant,
 			matchType,
 			debugInfo: {
 				room: {
@@ -121,10 +129,14 @@ export async function GET(req: NextRequest) {
 					userId,
 					authenticatedUserId,
 				},
+				participants: {
+					count: participants.length,
+					ids: participantIds,
+					isUserInList: isUserParticipant,
+				},
 				isMatch: isHost,
 				matchType,
-				participantIds: participantIds,
-				participantCount: participants.length,
+				timestamp: new Date().toISOString(),
 			},
 		});
 	} catch (error) {

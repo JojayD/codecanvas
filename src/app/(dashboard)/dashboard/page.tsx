@@ -46,7 +46,7 @@ export default function Dashboard() {
 				name: userName || "New Room",
 				description: "A new collaborative coding room",
 				code: "// Start coding here...",
-				participants: [participantString], // Add creator as first participant
+				participants: [], // Add creator as first participant
 				prompt: "",
 				language: "javascript", // Default language
 				created_at: new Date().toISOString(),
@@ -55,6 +55,7 @@ export default function Dashboard() {
 			};
 
 			console.log("Creating room with data:", roomData);
+			// Store the creator ID in localStorage for future host checks
 			localStorage.setItem("created_by", userId || "");
 			const newRoom = await createRoom(roomData);
 
