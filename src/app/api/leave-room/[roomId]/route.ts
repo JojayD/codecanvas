@@ -1,71 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leaveRoom, handleHostExit } from "@/lib/supabaseRooms";
-import { auth } from "../../../../amplify/auth/resource";
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 
-// Support both GET and POST methods for flexibility
-export async function GET(request: NextRequest) {
-	return handleLeaveRoom(request);
-}
-
-export async function POST(request: NextRequest) {
-	return handleLeaveRoom(request);
-}
-
-async function handleLeaveRoom(request: NextRequest) {
+export async function POST(
+	request: NextRequest,
+	{ params }: { params: { roomId: string } }
+) {
 	try {
-		// Extract roomId and userId from query parameters or body
-		let roomId, userId, checkForHostExit;
+		// Get the roomId from the URL params (dynamic route)
+		const roomId = params.roomId;
+		console.log(`Dynamic route handler activated for roomId: ${roomId}`);
 
-		// Get body data for POST requests
+		// Get body data
 		let bodyData: {
-			roomId?: string | number;
 			userId?: string;
 			checkForHostExit?: boolean;
 		} = {};
-		if (request.method === "POST") {
-			try {
-				bodyData = await request.json();
-				console.log("POST body received:", bodyData);
-			} catch (e) {
-				console.error("Failed to parse POST body:", e);
-			}
+
+		try {
+			bodyData = await request.json();
+			console.log("POST body received:", bodyData);
+		} catch (e) {
+			console.error("Failed to parse POST body:", e);
+			return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 		}
 
-		if (request.method === "POST" && Object.keys(bodyData).length > 0) {
-			// Extract from POST body if available
-			roomId = bodyData.roomId;
-			userId = bodyData.userId;
-			checkForHostExit = bodyData.checkForHostExit === true;
-
-			console.log("Extracted from POST body:", {
-				roomId,
-				userId,
-				checkForHostExit,
-			});
-		} else {
-			// Fall back to query parameters
-			const searchParams = request.nextUrl.searchParams;
-			roomId = searchParams.get("roomId");
-			userId = searchParams.get("userId");
-			checkForHostExit = searchParams.get("checkForHostExit") === "true";
-
-			console.log("Extracted from query params:", {
-				roomId,
-				userId,
-				checkForHostExit,
-			});
-		}
-
-		// Extract roomId from URL path if not provided in query/body
-		if (!roomId) {
-			const urlParts = request.nextUrl.pathname.split("/");
-			const lastPart = urlParts[urlParts.length - 1];
-			if (lastPart && lastPart !== "leave-room") {
-				roomId = lastPart;
-				console.log("Extracted roomId from URL path:", roomId);
-			}
-		}
+		// Extract user ID and host check flag
+		const { userId, checkForHostExit = false } = bodyData;
 
 		// Validate parameters
 		if (!roomId || !userId) {
@@ -83,14 +44,25 @@ async function handleLeaveRoom(request: NextRequest) {
 			.single();
 
 		if (roomError) {
-			return NextResponse.json({ error: "Room not found" }, { status: 404 });
+			console.error(`Room not found error: ${roomError.message}`);
+			return NextResponse.json(
+				{
+					error: "Room not found",
+					details: roomError.message,
+				},
+				{ status: 404 }
+			);
 		}
+
+		console.log(
+			`Found room: ${room.id} (${room.roomId}), checking if user ${userId} is host`
+		);
 
 		// If checkForHostExit is true, explicitly call handleHostExit first
 		if (checkForHostExit) {
 			console.log("Checking if user is the host before leaving");
 
-			// Try to process host exit first - this now uses our fixed logic
+			// Try to process host exit first
 			const hostExitResult = await handleHostExit(roomId, userId);
 
 			if (hostExitResult) {
@@ -106,13 +78,12 @@ async function handleLeaveRoom(request: NextRequest) {
 			}
 		}
 
-		// Call the leaveRoom function to update the database
-		// Pass false for checkForHostExit since we've already done that check above
+		// Remove user from the room's participants list
 		console.log(`Removing user ${userId} from room ${roomId} participants list`);
 		const result = await leaveRoom(roomId, userId, false);
 
 		if (result) {
-			// Double-check if the room was closed (which would happen only if the host left)
+			// Check if the room was closed
 			const wasHostExit =
 				result.roomStatus === false &&
 				Array.isArray(result.participants) &&

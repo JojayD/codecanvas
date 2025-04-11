@@ -1,4 +1,5 @@
-import React, { createContext, useState, useCallback } from "react";
+import React, { createContext, useState, useCallback, useEffect } from "react";
+import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 
 export const RoomContext = createContext<any>(null);
 
@@ -9,15 +10,31 @@ export const RoomContextProvider = ({
 }) => {
 	const [room, setRoom] = useState<any>(null);
 	const [currentUser, setCurrentUser] = useState<any>(null);
+	const [authUserId, setAuthUserId] = useState<string | null>(null);
 
+	// Fetch the authenticated user ID on mount
+	useEffect(() => {
+		const getAuthUserId = async () => {
+			try {
+				const { data } = await supabase.auth.getSession();
+				const id = data?.session?.user?.id || null;
+				setAuthUserId(id);
+			} catch (error) {
+				console.error("[Room] Error getting auth user ID:", error);
+			}
+		};
+
+		getAuthUserId();
+	}, []);
+
+	// Function to leave a room, which will check host status and close the room if needed
 	const leaveRoom = useCallback(async () => {
 		if (!room) {
-			console.log("[Room] No room to leave");
 			return;
 		}
 
-		const roomId = room.roomId;
-		console.log(`[Room] Attempting to leave room: ${roomId}`);
+		const roomId = room.roomId || room.id;
+		const userId = currentUser?.userId;
 
 		// Check if user is host before leaving
 		try {
@@ -29,21 +46,18 @@ export const RoomContextProvider = ({
 				debugUrl += `&created_by=${encodeURIComponent(room.created_by)}`;
 			}
 
-			// Log the URL for debugging
-			console.log(`[Room] Checking host status with: ${debugUrl}`);
+			// Include auth user ID if available
+			if (authUserId) {
+				debugUrl += `&authUserId=${encodeURIComponent(authUserId)}`;
+			}
 
 			// Call the debug endpoint
 			const debugResponse = await fetch(debugUrl);
 			const debugData = await debugResponse.json();
 
-			console.log("[Room] Host detection result:", debugData);
-
 			// Check if user is host or last participant
-			if (debugData.isHost || debugData.isLastParticipant) {
-				console.log(
-					`[Room] User ${currentUser.userId} is ${debugData.isHost ? "host" : "last participant"}, match type: ${debugData.matchType || "not specified"}, force closing room: ${roomId}`
-				);
-
+			if (debugData.isHost) {
+				// Only trigger closure if user is the actual host
 				try {
 					// Use the force-close-room API to close the room
 					const closeResponse = await fetch("/api/force-close-room", {
@@ -54,58 +68,60 @@ export const RoomContextProvider = ({
 						body: JSON.stringify({
 							roomId: roomId,
 							userId: currentUser.userId,
+							authUserId: authUserId,
 							matchType: debugData.matchType,
 						}),
 					});
 
 					if (!closeResponse.ok) {
-						console.error(
-							`[Room] Failed to force close room: ${closeResponse.status}`
-						);
 						const errorData = await closeResponse.json();
-						console.error("[Room] Force close error:", errorData);
 					} else {
-						console.log("[Room] Room successfully force closed");
+						const closeData = await closeResponse.json();
 						setRoom(null);
 						return;
 					}
 				} catch (closeError) {
-					console.error("[Room] Error during force close:", closeError);
+					// Error handling
 				}
 			} else {
-				console.log(
-					`[Room] User ${currentUser.userId} is not detected as host or last participant`
-				);
+				// User is not host, proceed with normal participant removal
 			}
 		} catch (error) {
-			console.error("[Room] Error during host check:", error);
+			// Error handling
 		}
 
 		// Standard leave procedure if not host or if force close failed
-		console.log(
-			`[Room] Executing standard leave for roomId: ${roomId}, userId: ${currentUser.userId}`
-		);
 		try {
-			const leaveResponse = await fetch(
-				`/api/leave-room?roomId=${roomId}&userId=${encodeURIComponent(currentUser.userId)}`
-			);
+			// For non-host users, use the leave-room API which properly updates participants list
+			const leaveResponse = await fetch(`/api/leave-room/${roomId}`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					roomId,
+					userId: currentUser.userId,
+					checkForHostExit: false, // Explicitly set to false for non-host users
+				}),
+			});
 
 			if (!leaveResponse.ok) {
-				console.error(`[Room] Failed to leave room: ${leaveResponse.status}`);
-				const errorData = await leaveResponse.json();
-				console.error("[Room] Leave error:", errorData);
+				// Handle error
 			} else {
-				console.log("[Room] Left room successfully");
-				setRoom(null);
+				const leaveData = await leaveResponse.json();
+				// Don't set room to null immediately to allow real-time subscription to update first
+				setTimeout(() => {
+					setRoom(null);
+				}, 500);
 			}
-		} catch (leaveError) {
-			console.error("[Room] Error during leave room:", leaveError);
+		} catch (error) {
+			// Handle error
 		}
-	}, [currentUser, room, setRoom]);
+	}, [room, currentUser, authUserId]);
 
 	return (
 		<RoomContext.Provider
-			value={{ room, setRoom, currentUser, setCurrentUser, leaveRoom }}
+			value={{ room, setRoom, currentUser, setCurrentUser, leaveRoom, authUserId }}
 		>
 			{children}
 		</RoomContext.Provider>

@@ -8,85 +8,85 @@ export async function GET(request: NextRequest) {
 		const roomId = searchParams.get("roomId");
 		const userId = searchParams.get("userId");
 		const created_by = searchParams.get("created_by");
+		const authUserId = searchParams.get("authUserId");
 
-		console.log("[DEBUG-HOST] Request parameters:", {
+		console.log("[DEBUG-HOST] Request received with params:", {
 			roomId,
 			userId,
 			created_by,
+			authUserId,
 		});
 
 		if (!roomId || !userId) {
+			console.error("[DEBUG-HOST] Missing required parameters");
 			return NextResponse.json(
 				{ error: "Missing roomId or userId" },
 				{ status: 400 }
 			);
 		}
 
-		console.log(
-			`[DEBUG-HOST] Checking host status for roomId: ${roomId}, userId: ${userId}`
-		);
-
 		// Get room information
+		console.log(`[DEBUG-HOST] Fetching room data for roomId: ${roomId}`);
 		const { data: room, error: roomError } = await supabase
 			.from("rooms")
 			.select("*")
 			.eq("roomId", roomId)
 			.single();
 
-		console.log(
-			"[DEBUG-HOST] Room retrieved:",
-			room
-				? {
-						id: room.id,
-						roomId: room.roomId,
-						created_by: room.created_by,
-					}
-				: "Not found"
-		);
-
-		console.log("room.created_by", room.created_by);
-		console.log("\n\n[DEBGUG-HOST] UserId", userId);
-		console.log("\n\n[DEBGUG-HOST] room.created_by", room.created_by);
+		// Check if room exists before proceeding
 		if (roomError || !room) {
-			console.log(
-				`[DEBUG-HOST] Room not found: ${roomError?.message} debug host detection`
-			);
+			console.error(`[DEBUG-HOST] Room not found: ${roomError?.message}`);
 			return NextResponse.json({ error: "Room not found" }, { status: 404 });
 		}
 
+		console.log("[DEBUG-HOST] Room data retrieved:", {
+			id: room.id,
+			roomId: room.roomId,
+			created_by: room.created_by || "not set",
+		});
+
 		// Try to get the actual authenticated user ID for a more secure check
-		let authenticatedUserId = null;
-		try {
-			authenticatedUserId = await getUserId();
-			console.log("[DEBUG-HOST] Authenticated user ID:", authenticatedUserId);
-		} catch (authError) {
-			console.error(
-				"[DEBUG-HOST] Error getting authenticated user ID:",
-				authError
-			);
+		let authenticatedUserId = authUserId;
+		if (!authenticatedUserId) {
+			try {
+				authenticatedUserId = await getUserId();
+				console.log("[DEBUG-HOST] Retrieved auth user ID:", authenticatedUserId);
+			} catch (authError) {
+				console.log("[DEBUG-HOST] Failed to get auth user ID:", authError);
+				// Authentication error, continue with other checks
+			}
 		}
 
-		// Improved host detection logic:
-		// 1. First priority: Check if authenticated user ID matches room.created_by
-		// 2. Second priority: Check if userId matches room.created_by
-		// 3. Fallback: Check if create_by matches room.created_by (less secure)
-
+		// Improved host detection logic with null safeguards
 		let isHost = false;
 		let matchType = "none";
 
-		if (authenticatedUserId && room.created_by === authenticatedUserId) {
-			isHost = true;
-			matchType = "auth_id_match";
-		} else if (room.created_by === userId) {
-			isHost = true;
-			matchType = "user_id_match";
-		} else if (created_by && room.created_by === created_by) {
-			isHost = true;
-			matchType = "param_match";
+		// Safely check if room.created_by exists before comparing
+		if (room.created_by) {
+			if (authenticatedUserId && room.created_by === authenticatedUserId) {
+				isHost = true;
+				matchType = "auth_id_match";
+			} else if (room.created_by === userId) {
+				isHost = true;
+				matchType = "user_id_match";
+			} else if (created_by && room.created_by === created_by) {
+				isHost = true;
+				matchType = "param_match";
+			}
+
+			console.log("[DEBUG-HOST] Host check results:", {
+				"room.created_by": room.created_by,
+				authMatch: room.created_by === authenticatedUserId,
+				userIdMatch: room.created_by === userId,
+				paramMatch: created_by ? room.created_by === created_by : false,
+				isHost: isHost,
+				matchType: matchType,
+			});
+		} else {
+			console.log("[DEBUG-HOST] Room has no created_by field set");
 		}
-		const matchUUID = room.created_by === created_by;
-		console.log("[DEBUG-HOST] Match UUID:", matchUUID, "room.created_by:", room.created_by, "created_by:", created_by);
-		// Check if this is the last participant
+
+		// Check if this is the last participant, but keep this separate from host detection
 		const participants = Array.isArray(room.participants)
 			? room.participants
 			: [];
@@ -97,17 +97,14 @@ export async function GET(request: NextRequest) {
 		});
 
 		console.log(
-			`[DEBUG-HOST] Host detection result for ${userId}: ${isHost ? "IS HOST" : "NOT HOST"}`,
+			`[DEBUG-HOST] Final result for ${userId}: ${isHost ? "IS HOST" : "NOT HOST"}`,
 			{
-				created_by: room.created_by,
-				userId: userId,
-				authId: authenticatedUserId,
-				matchType,
-				isLastParticipant: isLastParticipant,
+				isLastParticipant,
 				participantCount: participants.length,
 			}
 		);
 
+		// Important: isHost and isLastParticipant are separate concepts - don't combine them for authorization
 		return NextResponse.json({
 			isHost: isHost,
 			isLastParticipant: isLastParticipant,
@@ -116,7 +113,7 @@ export async function GET(request: NextRequest) {
 				room: {
 					id: room.id,
 					roomId: room.roomId,
-					created_by: room.created_by,
+					created_by: room.created_by || "not set",
 					created_at: room.created_at,
 				},
 				userInfo: {

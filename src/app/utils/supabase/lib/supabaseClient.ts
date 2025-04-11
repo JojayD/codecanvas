@@ -131,7 +131,51 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase configuration.");
+	throw new Error("Missing Supabase configuration.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+	auth: {
+		persistSession: true,
+		autoRefreshToken: true,
+		detectSessionInUrl: true,
+		storageKey: "supabase.auth.token",
+	},
+});
+
+// Check and refresh authentication token
+export async function checkAndRefreshAuth() {
+	try {
+		console.log("Checking auth status...");
+		const { data, error } = await supabase.auth.getSession();
+
+		if (error) {
+			console.error("Session error:", error.message);
+			return {
+				isValid: false,
+				message: `Session error: ${error.message}`,
+			};
+		}
+
+		if (!data.session) {
+			console.log("No active session found");
+			return {
+				isValid: false,
+				message: "No active session found",
+			};
+		}
+
+		// Always assume session is valid if we have one
+		console.log("Session found and appears valid");
+		return {
+			isValid: true,
+			session: data.session,
+		};
+	} catch (e) {
+		console.error("Auth check failed:", e);
+		return {
+			isValid: false,
+			message: `Auth check error: ${e instanceof Error ? e.message : "Unknown error"}`,
+		};
+	}
+}

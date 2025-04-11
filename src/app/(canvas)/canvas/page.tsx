@@ -9,7 +9,6 @@ import Prompt from "../components/Prompt";
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 import React from "react";
 import { withAuthProtection } from "@/app/context/AuthProvider";
-import HostDetectionTest from "./HostDetectionTest";
 
 // Dynamically import the CodeEditor component to avoid SSR issues
 const DynamicCodeEditor = dynamic(
@@ -35,8 +34,14 @@ const DynamicWhiteBoard = dynamic(
 
 function Canvas() {
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const roomIdParam = searchParams.get("roomId");
+	const roomIdString = roomIdParam || "";
+	const roomId = roomIdString;
+	const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+	const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
 	const {
-		roomId,
 		code,
 		updateCode,
 		participants,
@@ -50,14 +55,6 @@ function Canvas() {
 		updateLanguage,
 		room,
 	} = useRoom();
-
-	// Add debug state
-	const [showDebug, setShowDebug] = useState(false);
-	const [roomIdString, setRoomIdString] = useState<string>("");
-
-	// Add state for update notifications
-	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
-	const [showUpdateNotification, setShowUpdateNotification] = useState(false);
 
 	// Track previous participants to detect changes
 	const prevParticipantsRef = React.useRef<string[]>([]);
@@ -115,10 +112,6 @@ function Canvas() {
 		// Update the ref with current participants
 		prevParticipantsRef.current = currentParticipantIds;
 	}, [participants]);
-
-	useEffect(() => {
-		setRoomIdString(roomId?.toString() || "");
-	}, [roomId]);
 
 	// Handle code updates
 	useEffect(() => {
@@ -279,7 +272,7 @@ function Canvas() {
 				created_by: room?.created_by,
 				createdBy: room?.createdBy,
 			});
-
+			const userId = currentUser.userId;
 			// Check if this user is likely the host
 			const isLastParticipant = participants.length <= 1;
 			const isCreator =
@@ -309,13 +302,11 @@ function Canvas() {
 
 				// Use the complete user ID including username if available
 				const userId = currentUser.userId;
-				const fullUserId = currentUser.username
-					? `${userId}:${currentUser.username}`
-					: userId;
+				const authUserId = authUser?.id;
+				console.log(`[LEAVE] Auth user ID: ${authUserId}`);
+				console.log(`[LEAVE] Calling API with userId: ${authUserId}`);
 
-				console.log(`[LEAVE] Calling API with userId: ${fullUserId}`);
-
-				const url = `/api/leave-room?roomId=${roomId}&userId=${encodeURIComponent(fullUserId)}&checkForHostExit=true`;
+				const url = `/api/leave-room?roomId=${roomId}&authUserId=${encodeURIComponent(authUserId || "")}&checkForHostExit=true`;
 				const response = await fetch(url);
 				const data = await response.json();
 
@@ -345,10 +336,6 @@ function Canvas() {
 		} catch (error) {
 			console.error("Error manually joining room:", error);
 		}
-	};
-
-	const handleDebug = () => {
-		setShowDebug(!showDebug);
 	};
 
 	if (loading)
@@ -471,65 +458,6 @@ function Canvas() {
 					>
 						Copy Invite Link
 					</button>
-					<button
-						className='bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
-						onClick={handleDebug}
-					>
-						Info
-					</button>
-					{/* Debug button to test host status */}
-					<button
-						className='bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
-						onClick={async () => {
-							if (roomId && currentUser?.userId) {
-								console.log("Testing host status with user info:", currentUser);
-								console.log("Room creator info:", {
-									created_by: room?.created_by,
-									createdBy: room?.createdBy,
-								});
-
-								try {
-									// Get Supabase auth user if available
-									let authUser = null;
-									try {
-										const { data } = await supabase.auth.getUser();
-										authUser = data?.user;
-										console.log("Auth user for host test:", authUser);
-									} catch (e) {
-										console.log("No auth user available for host test");
-									}
-
-									const url = `/api/test-host-exit?roomId=${roomId}&userId=${encodeURIComponent(currentUser.userId)}`;
-									const response = await fetch(url);
-									const data = await response.json();
-									console.log("Host test result:", data);
-
-									// Show a more detailed alert
-									let message = data.wasHostExit
-										? "✅ You ARE the host"
-										: "❌ You are NOT the host";
-
-									if (data.details) {
-										message +=
-											"\n\nDetection details:\n" +
-											Object.entries(data.details)
-												.map(([k, v]) => `${k}: ${v}`)
-												.join("\n");
-									}
-
-									alert(message);
-								} catch (error) {
-									console.error("Error testing host status:", error);
-									alert("Error testing host status");
-								}
-							}
-						}}
-					>
-						Test Host
-					</button>
-					<span className='text-sm text-gray-300'>
-						Your ID: {currentUser.userId}
-					</span>
 				</div>
 			</div>
 
@@ -550,34 +478,6 @@ function Canvas() {
 			<div className='bg-gray-700 text-gray-300 px-4 py-1 text-xs'>
 				{lastUpdate || "Connecting..."}
 			</div>
-
-			{showDebug && (
-				<div className='bg-gray-900 text-white p-2 max-h-40 overflow-auto'>
-					<h3 className='font-bold'>Debug Information:</h3>
-					<p>Room ID: {roomId}</p>
-					<p>
-						Current User: {currentUser.userId} ({currentUser.username})
-					</p>
-					<p>Participants ({participants.length}):</p>
-					<ul className='pl-4'>
-						{participants.length === 0 ? (
-							<li className='text-gray-400'>No participants</li>
-						) : (
-							participants.map((p) => (
-								<li
-									key={p.userId}
-									className={p.userId === currentUser.userId ? "text-green-400" : ""}
-								>
-									{p.username} ({p.userId})
-								</li>
-							))
-						)}
-					</ul>
-				</div>
-			)}
-
-			{/* Add the test component in debug section */}
-			{showDebug && <HostDetectionTest />}
 
 			<div
 				style={{
