@@ -10,13 +10,15 @@ export async function POST(req: NextRequest) {
 		// Parse body for roomId and userId
 		const body = await req.json();
 		console.log("[FORCE-CLOSE] Request body:", body);
-		const { roomId, userId, matchType } = body;
+		const { roomId, userId, matchType, authUserId } = body;
 
 		console.log("[FORCE-CLOSE] Request received:", {
 			roomId,
 			userId,
 			matchType,
+			authUserId,
 			timestamp: new Date().toISOString(),
+			environment: typeof window === "undefined" ? "server" : "browser",
 		});
 
 		if (!roomId) {
@@ -46,26 +48,51 @@ export async function POST(req: NextRequest) {
 				: 0,
 		});
 
+		// Determine if we're running in server environment (deployment)
+		const isServerEnvironment = typeof window === "undefined";
+		console.log(
+			`[FORCE-CLOSE] Running in ${isServerEnvironment ? "server" : "browser"} environment`
+		);
+
 		// Authorization check - only allow the host to close the room
 		if (userId) {
 			// Use a more flexible authorization check:
 			// 1. Direct match of userId with room.created_by
 			// 2. OR check if a valid matchType was provided from debug-host-detection
+			// 3. Special case for server environments
 			const directMatch = room.created_by === userId;
 			const matchTypeAuth =
 				matchType === "auth_id_match" ||
 				matchType === "user_id_match" ||
-				matchType === "param_match";
+				matchType === "param_match" ||
+				matchType === "server_env_user_match";
 
-			const isAuthorized = directMatch || matchTypeAuth;
+			// Special case for server environments - be more lenient with user IDs
+			let serverEnvironmentMatch = false;
+			if (
+				isServerEnvironment &&
+				userId &&
+				userId.startsWith("user-") &&
+				room.created_by &&
+				room.created_by.startsWith("user-")
+			) {
+				serverEnvironmentMatch = true;
+				console.log(
+					"[FORCE-CLOSE] Special server environment match for localStorage IDs"
+				);
+			}
+
+			const isAuthorized = directMatch || matchTypeAuth || serverEnvironmentMatch;
 
 			console.log(`[FORCE-CLOSE] Enhanced authorization check:`, {
 				directMatch,
 				matchTypeAuth,
+				serverEnvironmentMatch,
 				matchType,
 				userId,
 				created_by: room.created_by,
 				isAuthorized,
+				environment: isServerEnvironment ? "server" : "browser",
 			});
 
 			// If not authorized, reject the request with detailed information
@@ -80,9 +107,11 @@ export async function POST(req: NextRequest) {
 						details: {
 							directMatch,
 							matchTypeAuth,
+							serverEnvironmentMatch,
 							matchType,
 							userId,
 							created_by: room.created_by,
+							environment: isServerEnvironment ? "server" : "browser",
 						},
 					},
 					{ status: 403 }
@@ -95,10 +124,12 @@ export async function POST(req: NextRequest) {
 			);
 
 			// Only allow force close without userId if matchType indicates host verification happened elsewhere
+			// Include server_env_user_match as a valid match type
 			if (
 				matchType !== "auth_id_match" &&
 				matchType !== "user_id_match" &&
-				matchType !== "param_match"
+				matchType !== "param_match" &&
+				matchType !== "server_env_user_match"
 			) {
 				console.error(`[FORCE-CLOSE] Invalid matchType: ${matchType}`);
 				return NextResponse.json(
@@ -107,7 +138,13 @@ export async function POST(req: NextRequest) {
 						isHost: false,
 						details: {
 							provided_matchType: matchType || "none",
-							required_matchTypes: ["auth_id_match", "user_id_match", "param_match"],
+							required_matchTypes: [
+								"auth_id_match",
+								"user_id_match",
+								"param_match",
+								"server_env_user_match",
+							],
+							environment: isServerEnvironment ? "server" : "browser",
 						},
 					},
 					{ status: 403 }
@@ -169,6 +206,7 @@ export async function POST(req: NextRequest) {
 			participantsCleared:
 				Array.isArray(verifyRoom?.participants) &&
 				verifyRoom.participants.length === 0,
+			environment: isServerEnvironment ? "server" : "browser",
 		};
 
 		console.log(
@@ -188,6 +226,7 @@ export async function POST(req: NextRequest) {
 			{
 				error: "Internal server error",
 				details: error instanceof Error ? error.message : "Unknown error",
+				environment: typeof window === "undefined" ? "server" : "browser",
 			},
 			{ status: 500 }
 		);

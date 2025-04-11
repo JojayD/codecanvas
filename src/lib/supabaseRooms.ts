@@ -411,6 +411,12 @@ export async function handleHostExit(
 			`[HOST EXIT] *** START *** Checking if user ${userId} is the host of room ${roomId}`
 		);
 
+		// Detect if we're running in a server environment
+		const isServerEnvironment = typeof window === "undefined";
+		console.log(
+			`[HOST EXIT] Running in ${isServerEnvironment ? "server" : "browser"} environment`
+		);
+
 		// Extract the base userId without the username part if needed
 		let baseUserId = userId;
 		const colonIndex = userId.indexOf(":");
@@ -436,79 +442,126 @@ export async function handleHostExit(
 			createdBy: room.createdBy,
 		});
 
-		// Get Supabase auth user information when available
+		// Get Supabase auth user information when available (only in browser)
 		let supabaseAuthUser = null;
 		try {
-			if (typeof window !== "undefined") {
+			if (!isServerEnvironment) {
 				const { data } = await supabase.auth.getUser();
 				supabaseAuthUser = data?.user;
 				console.log("[HOST EXIT] Supabase auth user:", supabaseAuthUser);
+			} else {
+				console.log("[HOST EXIT] Skipping auth user check in server environment");
 			}
 		} catch (err) {
 			console.log("[HOST EXIT] No authenticated Supabase user");
 		}
 
-		// Get localStorage userId to compare with room creator
-		const localStorageUserId =
-			typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+		// Get localStorage userId to compare with room creator (only in browser)
+		const localStorageUserId = !isServerEnvironment
+			? localStorage.getItem("userId")
+			: null;
+
 		console.log("[HOST EXIT] Current user IDs:", {
 			userIdFromParam: userId,
 			baseUserId,
-			localStorageUserId,
-			supabaseAuthId: supabaseAuthUser?.id,
+			localStorageUserId:
+				localStorageUserId || "not available in server environment",
+			supabaseAuthId: supabaseAuthUser?.id || "not available",
+			environment: isServerEnvironment ? "server" : "browser",
 		});
 
 		// ========== HOST DETECTION LOGIC ==========
 
 		// 1. First check: If Supabase authenticated user matches room creator
-		const isAuthUserCreator =
+		const isAuthUserCreator = !!(
 			supabaseAuthUser &&
 			(room.created_by === supabaseAuthUser.id ||
-				room.createdBy === supabaseAuthUser.id);
+				room.createdBy === supabaseAuthUser.id)
+		);
 
 		// 2. Second check: Direct match between userId and creator
-		const isDirectMatch =
+		const isDirectMatch = !!(
 			room.created_by === userId ||
 			room.createdBy === userId ||
 			room.created_by === baseUserId ||
-			room.createdBy === baseUserId;
+			room.createdBy === baseUserId
+		);
 
-		// 3. Third check: LocalStorage userId match
+		// 3. Third check: LocalStorage userId match (only in browser)
 		const isLocalStorageMatch =
-			localStorageUserId &&
-			(room.created_by === localStorageUserId ||
-				room.createdBy === localStorageUserId);
+			!isServerEnvironment &&
+			!!(
+				localStorageUserId &&
+				(room.created_by === localStorageUserId ||
+					room.createdBy === localStorageUserId)
+			);
 
 		// 4. Fourth check: Check if this is a localStorage user who created the room
 		// Compare the base pattern 'user-XXXXX' with details persisted in localStorage
 		const isLocalStorageCreator =
-			baseUserId === localStorageUserId &&
-			((room.created_by && !room.created_by.includes("@")) || // likely a user-XXX format
-				(room.createdBy && !room.createdBy.includes("@"))); // rather than email
+			!isServerEnvironment &&
+			!!(
+				baseUserId === localStorageUserId &&
+				((room.created_by && !room.created_by.includes("@")) || // likely a user-XXX format
+					(room.createdBy && !room.createdBy.includes("@")))
+			); // rather than email
 
 		// 5. Check for test host users (special case)
 		const isTestHost = userId.startsWith("test-host-");
 
-		// 6. Check if this is the last participant (relevant for test hosts)
+		// 6. Special case for server environment
+		const isServerMatch = false; // Default to false to prevent auto-closures in deployment
+
+		if (isServerEnvironment) {
+			// In server environment, be more careful with automatic closures
+			// Only allow explicit matches, not format-based matching
+			console.log(
+				"[HOST EXIT] Server environment detected - being restrictive with auto-closures"
+			);
+		}
+
+		// 7. Check if this is the last participant (relevant for test hosts)
 		const participants = Array.isArray(room.participants)
 			? room.participants
 			: [];
 		const isLastParticipant = participants.length <= 1;
 
 		// Determine if this user is the host based on all checks
-		const isHost =
-			isAuthUserCreator ||
-			isDirectMatch ||
-			isLocalStorageMatch ||
-			isLocalStorageCreator;
+		// In server environment, be more restrictive to prevent accidental closures
+		let isHost = false;
+
+		if (isServerEnvironment) {
+			// In server environment, only allow explicit matches
+			isHost = isDirectMatch;
+
+			// Don't auto-close if we're in server environment and not an explicit host match
+			if (!isHost) {
+				console.log(
+					"[HOST EXIT] Server environment detected - skipping auto-closure"
+				);
+			}
+		} else {
+			// In browser environment, use all checks
+			isHost =
+				isAuthUserCreator ||
+				isDirectMatch ||
+				isLocalStorageMatch ||
+				isLocalStorageCreator;
+		}
 
 		console.log("[HOST EXIT] Host detection results:", {
 			isAuthUserCreator,
 			isDirectMatch,
-			isLocalStorageMatch,
-			isLocalStorageCreator,
+			isLocalStorageMatch: isServerEnvironment
+				? "skipped in server"
+				: isLocalStorageMatch,
+			isLocalStorageCreator: isServerEnvironment
+				? "skipped in server"
+				: isLocalStorageCreator,
 			isTestHost,
+			isServerMatch,
 			isLastParticipant,
+			environment: isServerEnvironment ? "server" : "browser",
 			finalDecision: isHost || (isTestHost && isLastParticipant),
 		});
 
@@ -526,6 +579,7 @@ export async function handleHostExit(
 				participants: participants.length,
 				userId,
 				room_created_by: room.created_by,
+				environment: isServerEnvironment ? "server" : "browser",
 			});
 
 			const closedRoom = await closeRoomSimple(room.roomId || room.id);
