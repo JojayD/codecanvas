@@ -146,7 +146,9 @@ export async function joinRoom(
 	username: string
 ): Promise<Room | null> {
 	try {
-		console.log(`Attempting to join room ${roomId} as ${userId}:${username}`);
+		console.log(
+			`Attempting to join room ${roomId} as user ${userId}:${username}`
+		);
 
 		// First get the current room data
 		const room = await getRoom(roomId);
@@ -160,16 +162,69 @@ export async function joinRoom(
 			? room.participants
 			: [];
 
-		// Check if user is already in the room
+		console.log(
+			`Current participants before join: ${JSON.stringify(participants)}`
+		);
+
+		// Extract user ID without username for comparison
+		const baseUserId = userId.split(":")[0];
 		const participantString = `${userId}:${username}`;
-		if (participants.includes(participantString)) {
-			console.log("User already in room, skipping join");
+
+		// Improved duplicate check: Check if user is already in the room in any format
+		// This handles both "userId" and "userId:username" formats
+		const isUserAlreadyInRoom = participants.some((p) => {
+			// Check exact match
+			if (p === participantString) {
+				console.log(`Exact match found: ${p} equals ${participantString}`);
+				return true;
+			}
+
+			// Check if this participant entry starts with userId (handles userId:anyUsername)
+			if (p.startsWith(`${baseUserId}:`)) {
+				console.log(`Prefix match found: ${p} starts with ${baseUserId}:`);
+				return true;
+			}
+
+			// Check if this participant entry is just the userId (no username)
+			if (p === baseUserId) {
+				console.log(`Base match found: ${p} equals base ${baseUserId}`);
+				return true;
+			}
+
+			// Check if userId is part of a compound ID (handling edge cases)
+			const participantParts = p.split(":");
+			if (participantParts.length > 0 && participantParts[0] === baseUserId) {
+				console.log(
+					`Component match found: ${p} contains ${baseUserId} as first part`
+				);
+				return true;
+			}
+
+			return false;
+		});
+
+		if (isUserAlreadyInRoom) {
+			console.log(`User ${userId} (${username}) already in room, skipping join:`, {
+				userId,
+				participantString,
+				existingParticipants: participants,
+			});
 			return room; // User already in room
+		}
+
+		// Participant count check, after duplicates are filtered out
+		if (participants.length > 2) {
+			console.log(
+				`Room ${roomId} already has ${participants.length} participants, cannot join`
+			);
+			return null; // Room already full
 		}
 
 		// Add participant and update
 		const updatedParticipants = [...participants, participantString];
-		console.log("Updating participants:", updatedParticipants);
+		console.log(
+			`Updating participants to: ${JSON.stringify(updatedParticipants)}`
+		);
 		// Use the room.roomId to ensure we use the random ID for updates
 		return await updateRoom(room.roomId || room.id, {
 			participants: updatedParticipants,

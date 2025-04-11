@@ -113,6 +113,8 @@ export const RoomProvider: React.FC<{
 	// Add a ref to track if the user is currently typing
 	const isUserTyping = useRef(false);
 	const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	// Add a ref to track join progress
+	const joinInProgressRef = useRef(false);
 
 	// Function to set typing status with automatic timeout
 	const setTypingStatus = (isTyping: boolean) => {
@@ -134,6 +136,33 @@ export const RoomProvider: React.FC<{
 
 	// Add state to track intentional leaves
 	const [intentionalLeave, setIntentionalLeave] = useState(false);
+
+	// Function to parse and normalize participants array
+	const parseParticipants = (participantsList: any[]): Participant[] => {
+		// Ensure we have an array to work with
+		const participants = Array.isArray(participantsList) ? participantsList : [];
+
+		// Parse participants from array of strings to array of objects
+		// Also deduplicate participants by userId
+		const seenUserIds = new Set<string>();
+		const parsedParticipants: Participant[] = [];
+
+		participants.forEach((p) => {
+			const parts = typeof p === "string" ? p.split(":") : [p, "Unknown"];
+			const userId = parts[0] || "";
+
+			// Skip if we've already seen this userId (deduplicate)
+			if (userId && !seenUserIds.has(userId)) {
+				seenUserIds.add(userId);
+				parsedParticipants.push({
+					userId,
+					username: parts[1] || "Unknown",
+				});
+			}
+		});
+
+		return parsedParticipants;
+	};
 
 	// Fetch room data on initial load
 	useEffect(() => {
@@ -165,19 +194,8 @@ export const RoomProvider: React.FC<{
 					setCode(roomData.code || "// Start coding here...");
 					setPrompt(roomData.prompt || "");
 
-					// Ensure participants is an array
-					const participantsList = Array.isArray(roomData.participants)
-						? roomData.participants
-						: [];
-
-					// Parse participants from array of strings to array of objects
-					const parsedParticipants = participantsList.map((p) => {
-						const parts = p.split(":");
-						return {
-							userId: parts[0] || "",
-							username: parts[1] || "Unknown",
-						};
-					});
+					// Use the parseParticipants helper to normalize and deduplicate participants
+					const parsedParticipants = parseParticipants(roomData.participants || []);
 
 					setParticipants(parsedParticipants);
 
@@ -229,19 +247,8 @@ export const RoomProvider: React.FC<{
 			// Important: Update the room state with the latest data first
 			setRoom(updatedRoom);
 
-			// Ensure participants is an array
-			const participantsList = Array.isArray(updatedRoom.participants)
-				? updatedRoom.participants
-				: [];
-
-			// Parse participants
-			const parsedParticipants = participantsList.map((p) => {
-				const parts = p.split(":");
-				return {
-					userId: parts[0] || "",
-					username: parts[1] || "Unknown",
-				};
-			});
+			// Use the parseParticipants helper to normalize and deduplicate participants
+			const parsedParticipants = parseParticipants(updatedRoom.participants || []);
 
 			// Get current participant IDs for comparison
 			const currentParticipantIds = parsedParticipants.map((p) => p.userId);
@@ -289,13 +296,10 @@ export const RoomProvider: React.FC<{
 			});
 
 			// Check if room was closed by host (roomStatus is false and no participants)
-			const isRoomClosed =
-				updatedRoom.roomStatus === false ||
-				(Array.isArray(updatedRoom.participants) &&
-					updatedRoom.participants.length === 0);
+			const isRoomClosed = updatedRoom.roomStatus === false;
 
 			if (isRoomClosed) {
-				console.log("Room was closed by host - all participants have been removed");
+				console.log("Room was closed by host - roomStatus is false");
 				// Set hasJoined to false since everyone has been kicked out
 				setHasJoined(false);
 				// Show an alert or notification that the room was closed by host
@@ -495,7 +499,17 @@ export const RoomProvider: React.FC<{
 			return;
 		}
 
-		if (participants.length >= 2) {
+		// Check if user is already in participants list
+		const isUserAlreadyInRoom = participants.some(
+			(p) => p.userId === currentUser.userId
+		);
+		if (isUserAlreadyInRoom) {
+			console.log("User already in participants list, updating hasJoined state");
+			setHasJoined(true);
+			return;
+		}
+
+		if (participants.length > 2) {
 			console.log("Room already has 2 participants, cannot join");
 			alert(
 				"This room is already full (maximum 2 participants). You will be redirected to the dashboard."
@@ -506,6 +520,13 @@ export const RoomProvider: React.FC<{
 		}
 
 		try {
+			// Set join in progress flag
+			if (joinInProgressRef.current) {
+				console.log("Join already in progress, skipping duplicate request");
+				return;
+			}
+
+			joinInProgressRef.current = true;
 			console.log("Joining room as:", currentUser);
 			console.log("[JOIN] Room state before joining:", {
 				roomId: roomIdFromParams,
@@ -536,8 +557,10 @@ export const RoomProvider: React.FC<{
 		} catch (error) {
 			console.error("[JOIN] Error joining room:", error);
 			setError(error instanceof Error ? error : new Error("Failed to join room"));
+		} finally {
+			joinInProgressRef.current = false;
 		}
-	}, [roomIdFromParams, currentUser, hasJoined, room]);
+	}, [roomIdFromParams, currentUser, hasJoined, room, participants]);
 
 	// Function to clean up local storage when leaving room
 	const cleanupLocalStorage = () => {
@@ -580,7 +603,11 @@ export const RoomProvider: React.FC<{
 							console.error(
 								`[LEAVE] Host detection API error: ${response.status} ${response.statusText}`
 							);
-							// Fall back to basic leave without host check if endpoint fails
+							// IMPORTANT FIX: Don't try to force close if we can't confirm host status
+							console.log(
+								"[LEAVE] Could not confirm host status, proceeding with normal leave"
+							);
+							// Skip rest of host check and proceed with normal leave
 							throw new Error(`Failed to check host status: ${response.statusText}`);
 						}
 
@@ -595,10 +622,14 @@ export const RoomProvider: React.FC<{
 							// Use force-close-room API to close room
 							const closeResponse = await fetch("/api/force-close-room", {
 								method: "POST",
-								headers: { "Content-Type": "application/json" },
+								headers: {
+									"Content-Type": "application/json",
+									// Add authorization headers if needed
+								},
 								body: JSON.stringify({
 									roomId: roomIdToUse,
 									userId,
+									matchType: data.matchType, // Include the matchType from host detection
 								}),
 							});
 
@@ -606,29 +637,41 @@ export const RoomProvider: React.FC<{
 								console.error(
 									`[LEAVE] Force close API error: ${closeResponse.status} ${closeResponse.statusText}`
 								);
-								throw new Error(
-									`Failed to force close room: ${closeResponse.statusText}`
-								);
-							}
+								// IMPORTANT FIX: Handle the 403 error specifically and fall back to normal leave
+								if (closeResponse.status === 403) {
+									console.log(
+										"[LEAVE] 403 error from force-close, proceeding with normal leave"
+									);
+									// Fallback to normal leave procedure without throwing an error
+								} else {
+									throw new Error(
+										`Failed to force close room: ${closeResponse.statusText}`
+									);
+								}
+							} else {
+								const closeData = await closeResponse.json();
+								console.log("[LEAVE] Force close result:", closeData);
 
-							const closeData = await closeResponse.json();
-							console.log("[LEAVE] Force close result:", closeData);
+								if (closeData.success) {
+									// Delay navigation to ensure other clients get the update
+									setTimeout(() => {
+										setRoom(null);
+										if (refresh) router.refresh();
+										router.push("/dashboard");
 
-							if (closeData.success) {
-								// Delay navigation to ensure other clients get the update
-								setTimeout(() => {
-									setRoom(null);
-									if (refresh) router.refresh();
-									router.push("/dashboard");
-
-									// Clear local storage data
-									cleanupLocalStorage();
-								}, 500);
-								return; // Exit early if room closed
+										// Clear local storage data
+										cleanupLocalStorage();
+									}, 500);
+									return; // Exit early if room closed
+								}
 							}
 						} else if (data.isLastParticipant) {
 							console.log(
 								"[LEAVE] User is last participant but not host, proceeding with normal leave"
+							);
+						} else {
+							console.log(
+								"[LEAVE] User is not host and not last participant, proceeding with normal leave"
 							);
 						}
 					} catch (error) {
@@ -825,9 +868,18 @@ export const RoomProvider: React.FC<{
 
 	// Auto-join the room when the component mounts and room data is loaded
 	useEffect(() => {
-		if (!loading && room && !hasJoined && !intentionalLeave) {
+		if (
+			!loading &&
+			room &&
+			!hasJoined &&
+			!intentionalLeave &&
+			!joinInProgressRef.current
+		) {
 			console.log("Auto-joining room after initial load");
-			joinRoom();
+			joinRoom().catch((err) => {
+				console.error("Error during auto-join:", err);
+				joinInProgressRef.current = false;
+			});
 		}
 	}, [loading, room, hasJoined, joinRoom, intentionalLeave]);
 
