@@ -56,6 +56,7 @@ export const RoomProvider: React.FC<{
 	roomId: string | number;
 }> = ({ children, roomId }) => {
 	const searchParams = useSearchParams();
+	const roomJoinedRef = useRef(false);
 	// Convert the roomId parameter to a number if it's a string
 	const roomIdFromParams =
 		typeof roomId === "string"
@@ -863,22 +864,53 @@ export const RoomProvider: React.FC<{
 		}
 	}, [loading, room, hasJoined, joinRoom, intentionalLeave]);
 
-	// Clean up when component unmounts
+	// Set up a reliable method to leave the room when user navigates away
 	useEffect(() => {
-		return () => {
-			// Skip automatic leaving during development to prevent issues during hot reloading and testing
-			const isDevelopment = process.env.NODE_ENV === "development";
+		// Track if we've actually joined the room
+		
 
-			if (hasJoined && !isDevelopment) {
-				console.log("Component unmounting, leaving room");
-				leaveRoom(true, false)
-					.then(() => console.log("Left room on unmount"))
-					.catch((err) => console.error("Error leaving room on unmount:", err));
-			} else if (isDevelopment && hasJoined) {
+		// When a user successfully joins, mark the room as joined
+		if (hasJoined) {
+			roomJoinedRef.current = true;
+		}
+
+		// Skip cleanup steps if we never actually joined the room
+		// or if the intentional leave already handled it
+		const cleanupRoom = () => {
+			if (!roomJoinedRef.current || intentionalLeave) {
+				console.log(
+					"Skipping leave room on unmount - never properly joined or already left"
+				);
+				return;
+			}
+
+			// Try to clean up properly on unmount
+			console.log("Component unmounting, leaving room");
+
+			// Skip leave check in development mode to prevent issues with hot reloading
+			const isDevelopment = process.env.NODE_ENV === "development";
+			if (isDevelopment) {
 				console.log("Skipping leave room on unmount in development mode");
+				return;
+			}
+
+			// Try to leave the room but don't block unmounting
+			try {
+				if (roomIdFromParams && currentUser?.userId) {
+					console.log("[LEAVE] Calling leaveRoom from cleanup");
+					// Call leaveRoom without host exit check on unmount
+					leaveRoomSupabase(roomIdFromParams, currentUser.userId, false).catch((e) =>
+						console.error("Error leaving room on unmount:", e)
+					);
+				}
+			} catch (error) {
+				console.error("Error in RoomProvider cleanup when unmounting:", error);
 			}
 		};
-	}, [roomIdFromParams, currentUser.userId, hasJoined, leaveRoom]);
+
+		// Return the cleanup function
+		return cleanupRoom;
+	}, [roomIdFromParams, currentUser?.userId, hasJoined, intentionalLeave]);
 
 	return (
 		<RoomContext.Provider

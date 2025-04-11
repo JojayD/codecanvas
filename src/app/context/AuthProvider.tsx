@@ -162,16 +162,19 @@ export function withAuthProtection<P extends object>(
 		const [authError, setAuthError] = useState<string | null>(null);
 		const [refreshAttempts, setRefreshAttempts] = useState(0);
 		const [forceRender, setForceRender] = useState(false);
+		// Add a flag to keep track if component was ever rendered
+		const [wasEverRendered, setWasEverRendered] = useState(false);
 
 		console.log("Auth protection status:", { isAuthenticated, loading, error });
 
-		// Force render after 5 seconds regardless of auth state
+		// Force render after 3 seconds regardless of auth state (reduced from 5 to 3 seconds)
 		useEffect(() => {
 			const timer = setTimeout(() => {
 				if (loading || isRefreshing) {
+					console.log("Auth protection timeout reached, forcing render");
 					setForceRender(true);
 				}
-			}, 5000); // 5 second timeout
+			}, 3000); // 3 second timeout
 
 			return () => clearTimeout(timer);
 		}, [loading, isRefreshing]);
@@ -200,9 +203,23 @@ export function withAuthProtection<P extends object>(
 			attemptRefresh();
 		}, [isAuthenticated, loading, refreshAuth, refreshAttempts]);
 
+		// Mark component as rendered once it's been rendered at least once
+		useEffect(() => {
+			if (!wasEverRendered && (isAuthenticated || forceRender)) {
+				setWasEverRendered(true);
+			}
+		}, [isAuthenticated, forceRender, wasEverRendered]);
+
+		// Always render the component if it was ever rendered
+		// This prevents unmounting/remounting during auth refresh
+		if (wasEverRendered) {
+			return <Component {...props} />;
+		}
+
 		// Force render the component if timeout reached or max retries exceeded
 		if (forceRender || (refreshAttempts >= 2 && loading)) {
 			console.log("Bypassing auth check and rendering component");
+			setWasEverRendered(true); // Mark as rendered
 			return <Component {...props} />;
 		}
 
@@ -234,7 +251,10 @@ export function withAuthProtection<P extends object>(
 							Refresh Page
 						</button>
 						<button
-							onClick={() => setForceRender(true)}
+							onClick={() => {
+								setForceRender(true);
+								setWasEverRendered(true); // Mark as rendered on continue
+							}}
 							className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm'
 						>
 							Continue Anyway
@@ -245,6 +265,7 @@ export function withAuthProtection<P extends object>(
 		}
 
 		// Render the protected component if authenticated
+		setWasEverRendered(true); // Mark as rendered
 		return <Component {...props} />;
 	};
 }

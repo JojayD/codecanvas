@@ -41,6 +41,8 @@ function Canvas() {
 	const [showUpdateNotification, setShowUpdateNotification] = useState(false);
 	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
 	const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
+	// Add a state to track if the component is safely mounted
+	const [isSafeToJoin, setIsSafeToJoin] = useState(false);
 	const {
 		code,
 		updateCode,
@@ -61,6 +63,18 @@ function Canvas() {
 
 	// Track previous participants to detect changes
 	const prevParticipantsRef = React.useRef<string[]>([]);
+
+	// Add a delayed "safe to join" effect to ensure component is stably mounted before joining
+	useEffect(() => {
+		// Wait a short delay before setting it's safe to join
+		// This ensures auth and other initialization processes have completed
+		const safetyTimer = setTimeout(() => {
+			console.log("Component is now considered stable and safe to join room");
+			setIsSafeToJoin(true);
+		}, 1000);
+
+		return () => clearTimeout(safetyTimer);
+	}, []);
 
 	// Handle real-time updates
 	useEffect(() => {
@@ -126,6 +140,12 @@ function Canvas() {
 
 	// Force join the room when component mounts
 	useEffect(() => {
+		// Don't attempt to join until component is stable
+		if (!isSafeToJoin) {
+			console.log("Waiting for component to stabilize before joining room...");
+			return;
+		}
+
 		// Track if a join is in progress or has been completed
 		let joinAttempted = false;
 
@@ -193,6 +213,14 @@ function Canvas() {
 
 		// Leave the room when component unmounts
 		return () => {
+			// Only execute cleanup if we've actually joined the room
+			if (!hasJoinedLocally) {
+				console.log(
+					"Component unmounting but never joined room - skipping cleanup"
+				);
+				return;
+			}
+
 			console.log("Canvas component unmounting - cleaning up");
 			window.removeEventListener("beforeunload", handleBeforeUnload);
 
@@ -231,7 +259,15 @@ function Canvas() {
 				);
 			}
 		};
-	}, [leaveRoom, joinRoom, roomId, currentUser, router]);
+	}, [
+		leaveRoom,
+		joinRoom,
+		roomId,
+		currentUser,
+		router,
+		isSafeToJoin,
+		hasJoinedLocally,
+	]);
 
 	// Effect to handle room status changes and redirect if room is closed
 	useEffect(() => {
