@@ -1,39 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRoom } from "@/lib/supabaseRooms";
+import { createClient } from "@supabase/supabase-js";
+
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(request: NextRequest) {
-	// Extract roomId from query parameters
-	const searchParams = request.nextUrl.searchParams;
-	const roomId = searchParams.get("roomId");
-
-	// Validate parameters
-	if (!roomId) {
-		return NextResponse.json(
-			{ error: "Missing required parameter: roomId" },
-			{ status: 400 }
-		);
-	}
-
 	try {
-		// Call the getRoom function to get the room status
-		console.log(`API: Checking status of room ${roomId} via API call`);
-		const room = await getRoom(roomId);
+		// Get roomId from query parameters
+		const searchParams = request.nextUrl.searchParams;
+		const roomId = searchParams.get("roomId");
 
-		if (room) {
+		if (!roomId) {
 			return NextResponse.json(
-				{
-					success: true,
-					roomStatus: room.roomStatus,
-					participantsCount: (room.participants || []).length,
-					participants: room.participants,
-				},
-				{ status: 200 }
+				{ error: "Missing roomId parameter" },
+				{ status: 400 }
 			);
-		} else {
+		}
+
+		console.log(`[ROOM-STATUS] Checking status for room: ${roomId}`);
+
+		// Get room from database
+		const { data: room, error } = await supabase
+			.from("rooms")
+			.select("roomId, status, created_by, created_at")
+			.eq("roomId", roomId)
+			.single();
+
+		if (error) {
+			console.log(`[ROOM-STATUS] Error fetching room ${roomId}: ${error.message}`);
 			return NextResponse.json({ error: "Room not found" }, { status: 404 });
 		}
+
+		// Get participants
+
+		return NextResponse.json({
+			room: {
+				id: room.roomId,
+				status: room.status,
+				created_by: room.created_by,
+				created_at: room.created_at,
+			},
+			isActive: room.status === "active",
+		});
 	} catch (error) {
-		console.error("Error in room-status API:", error);
+		console.error("[ROOM-STATUS] Unexpected error:", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 	}
 }

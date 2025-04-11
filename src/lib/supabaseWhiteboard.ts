@@ -1,5 +1,5 @@
 "use client";
-import { supabase } from "./supabaseClient";
+import { supabase } from "../app/utils/supabase/lib/supabaseClient";
 import { Whiteboard, WhiteboardContent, KonvaShape } from "./supabase";
 import { v4 as uuidv4 } from "uuid";
 
@@ -344,7 +344,7 @@ export function subscribeToWhiteboardChanges(
 				callback(whiteboard);
 			}
 		)
-		.subscribe((status: { event: string; status: string }) => {
+		.subscribe((status) => {
 			console.log(`Whiteboard subscription status:`, status);
 		});
 }

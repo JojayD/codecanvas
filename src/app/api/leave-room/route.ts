@@ -1,36 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leaveRoom, handleHostExit } from "@/lib/supabaseRooms";
 
+// Support both GET and POST methods for flexibility
 export async function GET(request: NextRequest) {
-	// Extract roomId and userId from query parameters
-	const searchParams = request.nextUrl.searchParams;
-	const roomId = searchParams.get("roomId");
-	const userId = searchParams.get("userId");
+	return handleLeaveRoom(request);
+}
 
-	// Get the checkForHostExit parameter, defaulting to false
-	const checkForHostExit = searchParams.get("checkForHostExit") === "true";
+export async function POST(request: NextRequest) {
+	return handleLeaveRoom(request);
+}
 
-	// Validate parameters
-	if (!roomId || !userId) {
-		return NextResponse.json(
-			{ error: "Missing required parameters: roomId and userId" },
-			{ status: 400 }
-		);
-	}
-
+async function handleLeaveRoom(request: NextRequest) {
 	try {
+		// Extract roomId and userId from query parameters or body
+		let roomId, userId, checkForHostExit;
+
+		if (request.method === "POST") {
+			// For POST requests, extract from body
+			const body = await request.json();
+			roomId = body.roomId;
+			userId = body.userId;
+			checkForHostExit = body.checkForHostExit === true;
+		} else {
+			// For GET requests, extract from query params
+			const searchParams = request.nextUrl.searchParams;
+			roomId = searchParams.get("roomId");
+			userId = searchParams.get("userId");
+			checkForHostExit = searchParams.get("checkForHostExit") === "true";
+		}
+
+		// Extract roomId from URL path if not provided in query/body
+		if (!roomId) {
+			const urlParts = request.nextUrl.pathname.split("/");
+			const lastPart = urlParts[urlParts.length - 1];
+			if (lastPart && lastPart !== "leave-room") {
+				roomId = lastPart;
+			}
+		}
+
+		console.log(
+			`[LEAVE-ROOM API] Received request to leave roomId: ${roomId}, userId: ${userId}, checkForHostExit: ${checkForHostExit}`
+		);
+
+		// Validate parameters
+		if (!roomId || !userId) {
+			return NextResponse.json(
+				{ error: "Missing required parameters: roomId and userId" },
+				{ status: 400 }
+			);
+		}
+
 		// If checkForHostExit is true, explicitly call handleHostExit first
 		if (checkForHostExit) {
 			console.log(
-				`API: Directly checking if user ${userId} is host of room ${roomId}`
+				`[LEAVE-ROOM API] Directly checking if user ${userId} is host of room ${roomId}`
 			);
 
-			// Try to process host exit first
+			// Try to process host exit first - this now uses our fixed logic
 			const hostExitResult = await handleHostExit(roomId, userId);
 
 			if (hostExitResult) {
 				console.log(
-					`API: User ${userId} WAS the host and room ${roomId} was closed`
+					`[LEAVE-ROOM API] User ${userId} WAS identified as the host and room ${roomId} was closed`
 				);
 				return NextResponse.json(
 					{
@@ -43,19 +74,19 @@ export async function GET(request: NextRequest) {
 			}
 
 			console.log(
-				`API: User ${userId} was NOT the host of room ${roomId}, proceeding with normal leave`
+				`[LEAVE-ROOM API] User ${userId} was NOT identified as the host of room ${roomId}, proceeding with normal leave`
 			);
 		}
 
 		// Call the leaveRoom function to update the database
+		// Pass false for checkForHostExit since we've already done that check above
 		console.log(
-			`API: User ${userId} is leaving room ${roomId} via API call, checkForHostExit: ${checkForHostExit}`
+			`[LEAVE-ROOM API] User ${userId} is leaving room ${roomId}, checkForHostExit: ${checkForHostExit}`
 		);
-		const result = await leaveRoom(roomId, userId, false); // Pass false because we already checked for host exit above
+		const result = await leaveRoom(roomId, userId, false);
 
 		if (result) {
-			// Double-check if the room was closed (which typically means the host left)
-			// We use roomStatus === false and empty participants list as indicators
+			// Double-check if the room was closed (which would happen only if the host left)
 			const wasHostExit =
 				result.roomStatus === false &&
 				Array.isArray(result.participants) &&
@@ -75,7 +106,13 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: "Failed to leave room" }, { status: 500 });
 		}
 	} catch (error) {
-		console.error("Error in leave-room API:", error);
-		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+		console.error("[LEAVE-ROOM API] Error:", error);
+		return NextResponse.json(
+			{
+				error: "Internal server error",
+				details: error instanceof Error ? error.message : "Unknown error",
+			},
+			{ status: 500 }
+		);
 	}
 }

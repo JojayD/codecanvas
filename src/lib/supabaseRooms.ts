@@ -353,17 +353,18 @@ export async function handleHostExit(
 ): Promise<Room | null> {
 	try {
 		console.log(
-			`[HOST EXIT] Checking if user ${userId} is the host of room ${roomId}`
+			`[HOST EXIT] *** START *** Checking if user ${userId} is the host of room ${roomId}`
 		);
-		console.log("[HOST EXIT] Function called with:", { roomId, userId });
 
 		// Extract the base userId without the username part if needed
 		let baseUserId = userId;
 		const colonIndex = userId.indexOf(":");
 		if (colonIndex > 0) {
 			baseUserId = userId.substring(0, colonIndex);
-			console.log(`[HOST EXIT] Extracted base userId for check: ${baseUserId}`);
 		}
+		console.log(
+			`[HOST EXIT] BaseUserId (after stripping username): ${baseUserId}`
+		);
 
 		// Get the room to check if this user is the creator
 		const room = await getRoom(roomId);
@@ -372,70 +373,94 @@ export async function handleHostExit(
 			return null;
 		}
 
-		// DEBUG: Log ALL room properties to ensure we're not missing anything
-		console.log("[HOST EXIT] Full room data:", JSON.stringify(room, null, 2));
-		console.log("[HOST EXIT] Room data for host check:", {
+		// DEBUG: Log room data with creator information
+		console.log("[HOST EXIT] Room creator info:", {
 			id: room.id,
 			roomId: room.roomId,
-			roomStatus: room.roomStatus,
 			created_by: room.created_by,
 			createdBy: room.createdBy,
-			participants: room.participants,
 		});
 
-		// Log the localStorage userId to check for connection with room creation
+		// Get Supabase auth user information when available
+		let supabaseAuthUser = null;
+		try {
+			if (typeof window !== "undefined") {
+				const { data } = await supabase.auth.getUser();
+				supabaseAuthUser = data?.user;
+				console.log("[HOST EXIT] Supabase auth user:", supabaseAuthUser);
+			}
+		} catch (err) {
+			console.log("[HOST EXIT] No authenticated Supabase user");
+		}
+
+		// Get localStorage userId to compare with room creator
 		const localStorageUserId =
 			typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-		console.log("[HOST EXIT] localStorage userId:", localStorageUserId);
-		console.log("[HOST EXIT] Current leaving userId:", userId);
-		console.log("[HOST EXIT] Base userId:", baseUserId);
+		console.log("[HOST EXIT] Current user IDs:", {
+			userIdFromParam: userId,
+			baseUserId,
+			localStorageUserId,
+			supabaseAuthId: supabaseAuthUser?.id,
+		});
 
-		// Special case for test users and localStorage users
-		const isTestUser =
-			userId.startsWith("test-host-") || userId.startsWith("user-");
-		if (isTestUser) {
-			console.log(`[HOST EXIT] Test/localStorage user detected: ${userId}`);
+		// ========== HOST DETECTION LOGIC ==========
 
-			// Check participants list - if this is the only participant or the last one, consider as host
-			const participants = Array.isArray(room.participants)
-				? room.participants
-				: [];
+		// 1. First check: If Supabase authenticated user matches room creator
+		const isAuthUserCreator =
+			supabaseAuthUser &&
+			(room.created_by === supabaseAuthUser.id ||
+				room.createdBy === supabaseAuthUser.id);
 
-			if (participants.length <= 1) {
-				console.log(
-					`[HOST EXIT] This is the last or only participant - treating as host`
-				);
-				// Proceed to close room
-				console.log(
-					`[HOST EXIT] User ${userId} treated as host, closing room ${roomId}`
-				);
-				const closedRoom = await closeRoomSimple(room.roomId || room.id);
+		// 2. Second check: Direct match between userId and creator
+		const isDirectMatch =
+			room.created_by === userId ||
+			room.createdBy === userId ||
+			room.created_by === baseUserId ||
+			room.createdBy === baseUserId;
 
-				if (!closedRoom) {
-					console.error(`[HOST EXIT] Failed to close room ${roomId}`);
-					return null;
-				}
+		// 3. Third check: LocalStorage userId match
+		const isLocalStorageMatch =
+			localStorageUserId &&
+			(room.created_by === localStorageUserId ||
+				room.createdBy === localStorageUserId);
 
-				console.log(
-					`[HOST EXIT] Successfully closed room ${roomId} as last participant`
-				);
-				return closedRoom as Room;
-			}
-		}
+		// 4. Fourth check: Check if this is a localStorage user who created the room
+		// Compare the base pattern 'user-XXXXX' with details persisted in localStorage
+		const isLocalStorageCreator =
+			baseUserId === localStorageUserId &&
+			((room.created_by && !room.created_by.includes("@")) || // likely a user-XXX format
+				(room.createdBy && !room.createdBy.includes("@"))); // rather than email
 
-		// Direct check if the user ID matches the creator fields
-		const isDirectCreatorMatch =
-			(room.created_by &&
-				(room.created_by === userId || room.created_by === baseUserId)) ||
-			(room.createdBy &&
-				(room.createdBy === userId || room.createdBy === baseUserId));
+		// 5. Check for test host users (special case)
+		const isTestHost = userId.startsWith("test-host-");
 
-		console.log(`[HOST EXIT] Direct creator match: ${isDirectCreatorMatch}`);
+		// 6. Check if this is the last participant (relevant for test hosts)
+		const participants = Array.isArray(room.participants)
+			? room.participants
+			: [];
+		const isLastParticipant = participants.length <= 1;
 
-		if (isDirectCreatorMatch) {
-			// Is a direct creator match, proceed to close room
+		// Determine if this user is the host based on all checks
+		const isHost =
+			isAuthUserCreator ||
+			isDirectMatch ||
+			isLocalStorageMatch ||
+			isLocalStorageCreator;
+
+		console.log("[HOST EXIT] Host detection results:", {
+			isAuthUserCreator,
+			isDirectMatch,
+			isLocalStorageMatch,
+			isLocalStorageCreator,
+			isTestHost,
+			isLastParticipant,
+			finalDecision: isHost || (isTestHost && isLastParticipant),
+		});
+
+		// If this user is the host OR a test host who is the last participant, close the room
+		if (isHost || (isTestHost && isLastParticipant)) {
 			console.log(
-				`[HOST EXIT] User ${userId} IS the creator/host, closing room ${roomId}`
+				`[HOST EXIT] CLOSING ROOM: User ${userId} IS identified as the host`
 			);
 			const closedRoom = await closeRoomSimple(room.roomId || room.id);
 
@@ -444,85 +469,11 @@ export async function handleHostExit(
 				return null;
 			}
 
-			console.log(`[HOST EXIT] Successfully closed room ${roomId} as creator`);
+			console.log(`[HOST EXIT] Successfully closed room ${roomId}`);
 			return closedRoom as Room;
 		}
 
-		// If not directly matched, check other fields and localStorage
-		// Check all possible field names that might contain the creator ID
-		const possibleCreatorFields = [
-			"createdBy",
-			"created_by",
-			"creator",
-			"host",
-			"owner",
-			"admin",
-		];
-
-		const roomAsAny = room as any;
-
-		// Find the creator ID
-		let creatorId = null;
-		for (const field of possibleCreatorFields) {
-			if (roomAsAny[field]) {
-				creatorId = roomAsAny[field];
-				console.log(
-					`[HOST EXIT] Found creator ID in field '${field}': ${creatorId}`
-				);
-				break;
-			}
-		}
-
-		// For localStorage users, compare their ID with the creator and with localStorage
-		if (userId.startsWith("user-")) {
-			// Check if this localStorage ID is the same one that created the room
-			if (
-				localStorageUserId &&
-				(localStorageUserId === baseUserId ||
-					creatorId === localStorageUserId ||
-					creatorId?.includes(baseUserId.replace("user-", "")))
-			) {
-				console.log(
-					`[HOST EXIT] localStorage ID match with creator - treating as host`
-				);
-				// Is a localStorage creator match, proceed to close room
-				const closedRoom = await closeRoomSimple(room.roomId || room.id);
-
-				if (!closedRoom) {
-					console.error(`[HOST EXIT] Failed to close room ${roomId}`);
-					return null;
-				}
-
-				console.log(
-					`[HOST EXIT] Successfully closed room ${roomId} via localStorage match`
-				);
-				return closedRoom as Room;
-			}
-		}
-
-		// Final check - compare normalized IDs
-		const creatorIdStr = String(creatorId || "").trim();
-		const userIdStr = String(baseUserId || "").trim();
-
-		if (creatorIdStr === userIdStr) {
-			console.log(`[HOST EXIT] Creator ID string match - closing room`);
-			const closedRoom = await closeRoomSimple(room.roomId || room.id);
-
-			if (!closedRoom) {
-				console.error(`[HOST EXIT] Failed to close room ${roomId}`);
-				return null;
-			}
-
-			console.log(
-				`[HOST EXIT] Successfully closed room ${roomId} via string ID match`
-			);
-			return closedRoom as Room;
-		}
-
-		// If we reach here, user is not the host
-		console.log(
-			`[HOST EXIT] User ${userId} is NOT the host of room ${roomId}, skipping room closure`
-		);
+		console.log(`[HOST EXIT] NOT CLOSING ROOM: User ${userId} is NOT the host`);
 		return null;
 	} catch (error) {
 		console.error("[HOST EXIT] Error handling host exit:", error);
@@ -571,7 +522,7 @@ export function subscribeToRoom(
 						callback(payload.new as Room);
 					}
 				)
-				.subscribe((status: { event: string; status: string }) => {
+				.subscribe((status) => {
 					console.log(`Subscription status for room ${actualId}:`, status);
 				});
 		})
@@ -628,7 +579,7 @@ export function subscribeToCodeChanges(
 						callback(room.code || "");
 					}
 				)
-				.subscribe((status: { event: string; status: string }) => {
+				.subscribe((status) => {
 					console.log(`Code subscription status for room ${actualId}:`, status);
 				});
 		})
@@ -688,7 +639,7 @@ export function subscribeToPromptChanges(
 						callback(room.prompt || "");
 					}
 				)
-				.subscribe((status: { event: string; status: string }) => {
+				.subscribe((status) => {
 					console.log(`Prompt subscription status for room ${actualId}:`, status);
 				});
 		})
@@ -747,7 +698,7 @@ export function subscribeToLanguageChanges(
 						callback(room.language || ""); // Assuming 'language' is a field in your Room model
 					}
 				)
-				.subscribe((status: { event: string; status: string }) => {
+				.subscribe((status) => {
 					console.log(`Language subscription status for room ${actualId}:`, status);
 				});
 		})

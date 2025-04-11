@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { supabase } from "../app/utils/supabase/lib/supabaseClient";
 
 export interface Room {
 	id: string;

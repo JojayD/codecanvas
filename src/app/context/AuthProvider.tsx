@@ -1,6 +1,9 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase, checkAndRefreshAuth } from "@/lib/supabaseClient";
+import {
+	supabase,
+	checkAndRefreshAuth,
+} from "@/app/utils/supabase/lib/supabaseClient";
 import { Session } from "@supabase/supabase-js";
 
 // Define the Authentication context shape
@@ -106,7 +109,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			data: { subscription },
 		} = supabase.auth.onAuthStateChange(
 			async (event: any, currentSession: any) => {
-
 				if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
 					setSession(currentSession);
 					setError(null);

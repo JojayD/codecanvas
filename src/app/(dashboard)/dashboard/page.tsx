@@ -52,7 +52,7 @@ export default function Dashboard() {
 			};
 
 			console.log("Creating room with data:", roomData);
-
+			localStorage.setItem("created_by", userId || "");
 			const newRoom = await createRoom(roomData);
 
 			if (newRoom) {
@@ -81,6 +81,7 @@ export default function Dashboard() {
 		}
 		// Save username to localStorage
 		localStorage.setItem("username", userName);
+
 		router.push(`/canvas?roomId=${roomIdInput.trim()}`);
 	};
 
