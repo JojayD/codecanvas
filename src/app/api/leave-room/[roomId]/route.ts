@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { leaveRoom, handleHostExit } from "@/lib/supabaseRooms";
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 
-export async function POST(
-	request: NextRequest,
-	{ params }: { params: { roomId: string } }
-) {
+// Fix: Use the correct context type for Next.js App Router
+type RouteContext = {
+	params: {
+		roomId: string;
+	};
+};
+
+export async function POST(request: NextRequest, context: RouteContext) {
 	try {
 		// Get the roomId from the URL params (dynamic route)
-		const roomId = params.roomId;
+		const roomId = context.params.roomId;
 		console.log(`Dynamic route handler activated for roomId: ${roomId}`);
 
 		// Get body data
