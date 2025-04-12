@@ -556,7 +556,6 @@ export async function handleHostExit(
 			isLocalStorageMatch ||
 			(isLocalStorageCreator && room.created_by === localStorageUserId);
 
-
 		console.log("[HOST EXIT] Host detection results:", {
 			isAuthUserCreator,
 			isDirectMatch,
@@ -568,13 +567,19 @@ export async function handleHostExit(
 				: isLocalStorageCreator,
 			isTestHost,
 			isLastParticipant,
+			participantsCount: participants.length,
 			matchType: matchTracker.method,
 			matchDetails: matchTracker.details,
-			finalDecision: isHost || (isTestHost && isLastParticipant),
+			finalDecision:
+				isHost || (isTestHost && isLastParticipant && participants.length === 0),
 		});
 
-		// If this user is the host OR a test host who is the last participant, close the room
-		if (isHost || (isTestHost && isLastParticipant)) {
+		// If this user is the host OR a test host who is genuinely the last participant (no other participants)
+		// Modified to prevent premature closures during React component lifecycle events
+		if (
+			isHost ||
+			(isTestHost && isLastParticipant && participants.length === 0)
+		) {
 			console.log(
 				`[HOST EXIT] CLOSING ROOM: User ${userId} IS identified as the host via ${matchTracker.method}`
 			);
@@ -588,7 +593,6 @@ export async function handleHostExit(
 				userId,
 				room_created_by: room.created_by,
 				matchInfo: matchTracker,
-
 			});
 
 			const closedRoom = await closeRoomSimple(room.roomId || room.id);
