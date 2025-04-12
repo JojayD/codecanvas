@@ -121,6 +121,32 @@ export async function updateRoom(
 			throw new Error(`Cannot update - room not found with roomId: ${roomId}`);
 		}
 
+		// PRODUCTION SAFEGUARD: Prevent unintended participant removals
+		// Only allow empty participants array if explicitly closing room or if room was already empty
+		if (
+			Array.isArray(updates.participants) &&
+			updates.participants.length === 0 &&
+			updates.roomStatus !== false &&
+			room.roomStatus !== false &&
+			Array.isArray(room.participants) &&
+			room.participants.length > 0
+		) {
+			console.error(
+				"[CRITICAL] Prevented unintended participant removal in active room:",
+				{
+					roomId,
+					currentParticipants: room.participants,
+					updatingTo: updates.participants,
+					roomStatus: room.roomStatus,
+					updatingRoomStatus: updates.roomStatus,
+				}
+			);
+
+			// Fix the updates to preserve existing participants
+			updates.participants = room.participants;
+			console.log("[RECOVERY] Keeping existing participants:", room.participants);
+		}
+
 		// Use the actual database ID for the update operation (required by Supabase)
 		const { data, error } = await supabase
 			.from("rooms")
@@ -155,6 +181,12 @@ export async function joinRoom(
 		if (!room) {
 			console.error("Room not found:", roomId);
 			throw new Error("Room not found");
+		}
+
+		// CRITICAL: Verify room is still active before joining
+		if (room.roomStatus === false) {
+			console.error(`Cannot join room ${roomId} - room is already closed`);
+			return null;
 		}
 
 		// Ensure participants is an array
@@ -225,6 +257,16 @@ export async function joinRoom(
 		console.log(
 			`Updating participants to: ${JSON.stringify(updatedParticipants)}`
 		);
+
+		// CRITICAL: Add protection against empty participant array in production
+		// This prevents accidentally wiping out participants if there's a glitch
+		if (updatedParticipants.length === 0 && participants.length > 0) {
+			console.error(
+				"Error: Attempted to update with empty participants array, aborting join"
+			);
+			return null;
+		}
+
 		// Use the room.roomId to ensure we use the random ID for updates
 		return await updateRoom(room.roomId || room.id, {
 			participants: updatedParticipants,

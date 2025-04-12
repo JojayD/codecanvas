@@ -246,6 +246,24 @@ export const RoomProvider: React.FC<{
 			// Store previous participants for comparison (optional, but good for debugging)
 			const previousParticipants = [...participants]; // Shallow copy
 
+			// IMPORTANT: Add safeguard for production
+			// Skip any updates where participants array is empty but room is still open
+			// This prevents unintended participant removals during Supabase payload issues
+			if (
+				Array.isArray(updatedRoom.participants) &&
+				updatedRoom.participants.length === 0 &&
+				updatedRoom.roomStatus !== false &&
+				previousParticipants.length > 0
+			) {
+				console.log(
+					"[ROOM-UPDATE] ⚠️ Suspicious empty participants array in active room. Skipping update."
+				);
+				console.log(
+					"[ROOM-UPDATE] This may be a Supabase real-time subscription glitch."
+				);
+				return; // Skip this update entirely
+			}
+
 			// Important: Update the room state with the latest data first
 			setRoom(updatedRoom);
 
@@ -867,7 +885,6 @@ export const RoomProvider: React.FC<{
 	// Set up a reliable method to leave the room when user navigates away
 	useEffect(() => {
 		// Track if we've actually joined the room
-		
 
 		// When a user successfully joins, mark the room as joined
 		if (hasJoined) {
