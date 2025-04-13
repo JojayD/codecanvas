@@ -549,9 +549,20 @@ export const RoomProvider: React.FC<{
 						: 0,
 					roomStatus: result.roomStatus,
 				});
+				const updatedParticipants = parseParticipants(result.participants || []);
+				setParticipants(updatedParticipants);
 				setHasJoined(true);
 			} else {
 				console.error("Failed to join room, no result returned");
+				// Consider if the room was closed or another issue occurred
+				// Fetch the room again to check status if needed
+				const currentRoomState = await getRoomSupabase(roomIdFromParams);
+				if (currentRoomState && currentRoomState.roomStatus === false) {
+					alert("Cannot join, the room is closed.");
+					window.location.href = "/dashboard";
+				} else {
+					setError(new Error("Failed to join room - check logs for details."));
+				}
 			}
 		} catch (error) {
 			console.error("[JOIN] Error joining room:", error);
@@ -559,7 +570,14 @@ export const RoomProvider: React.FC<{
 		} finally {
 			joinInProgressRef.current = false;
 		}
-	}, [roomIdFromParams, currentUser, hasJoined, room, participants]);
+	}, [
+		roomIdFromParams,
+		currentUser,
+		hasJoined,
+		room,
+		participants,
+		setParticipants,
+	]); // Ensure setParticipants is in dependencies
 
 	// Function to clean up local storage when leaving room
 	const cleanupLocalStorage = () => {
