@@ -180,6 +180,7 @@ function Canvas() {
 						console.log("Room status check result:", data);
 
 						// If the room is marked as closed (roomStatus: false) but we haven't detected it yet
+						//TODO: Add a check to see if the room is still active before redirecting to dashboard
 						if (data.roomStatus === false && room?.roomStatus !== false) {
 							console.log(
 								"Room closed detected via polling - redirecting to dashboard"
@@ -228,36 +229,35 @@ function Canvas() {
 			clearInterval(statusCheckInterval);
 
 			// Get environment mode for logging purposes
-			const isDevelopment = process.env.NODE_ENV === "development";
+			// const isDevelopment = process.env.NODE_ENV === "development";
 
-			// Only perform leave operations (beacon and function call) in production
-			if (!isDevelopment) {
-				console.log("[PROD] Production mode - attempting to leave room on unmount");
+			// // Only perform leave operations (beacon and function call) in production
+			// if (!isDevelopment) {
+			// 	console.log("[PROD] Production mode - attempting to leave room on unmount");
 
-				// Send beacon for reliable leaving on page close/refresh
-				if (roomId && currentUser?.userId) {
-					console.log("[PROD] Sending leave room beacon on unmount");
-					const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}&checkForHostExit=false`;
-					navigator.sendBeacon(url);
-				}
+			// 	// Send beacon for reliable leaving on page close/refresh
+			// 	if (roomId && currentUser?.userId) {
+			// 		console.log("[PROD] Sending leave room beacon on unmount");
+			// 		const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}&checkForHostExit=false`;
+			// 		navigator.sendBeacon(url);
+			// 	}
 
-				// Call leaveRoom function, but don't block excessively
-				try {
-					console.log("[PROD] Calling leaveRoom function with timeout");
-					Promise.race([
-						leaveRoom(false), // Pass false to avoid host exit check on unmount
-						new Promise((resolve) => setTimeout(resolve, 300)),
-					]).catch((err) => {
-						console.error("[PROD] Error in leaveRoom during unmount:", err);
-					});
-				} catch (error) {
-					console.error("[PROD] Error in cleanup when unmounting Canvas:", error);
-				}
-			} else {
-				console.log(
-					"[DEV] Development mode - skipping leave room operations on unmount."
-				);
-			}
+			// 	// Call leaveRoom function, but don't block excessively
+			// 	try {
+			// 		console.log("[PROD] Calling leaveRoom function with timeout");
+			// 		Promise.race([
+			// 			leaveRoom(false), // Pass false to avoid host exit check on unmount
+			// 			new Promise((resolve) => setTimeout(resolve, 300)),
+			// 		]).catch((err) => {
+			// 			console.error("[PROD] Error in leaveRoom during unmount:", err);
+			// 		});
+			// 	} catch (error) {
+			// 		console.error("[PROD] Error in cleanup when unmounting Canvas:", error);
+			// 	}
+			// } else {
+			// 	console.log(
+			// 		"[DEV] Development mode - skipping leave room operations on unmount.");
+			// }
 		};
 	}, [
 		leaveRoom,
