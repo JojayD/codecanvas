@@ -78,12 +78,6 @@ export default function Home() {
 						</p>
 						<div className='flex flex-col sm:flex-row gap-4'>
 							<GoogleLoginButton />
-							<button
-								onClick={() => router.push("/examples")}
-								className='px-6 py-3 bg-white text-blue-600 rounded-lg shadow-md hover:bg-blue-50 transition-all'
-							>
-								See Examples
-							</button>
 						</div>
 					</div>
 					<div className='md:w-1/2 flex justify-center'>
@@ -115,6 +109,46 @@ export default function Home() {
 				</div>
 			</div>
 
+			{/** Videos section */}
+			<div className='bg-gradient-to-r from-blue-600 to-indigo-700 py-16 md:py-24'>
+				<div className='container mx-auto px-4 max-w-5xl'>
+					<h2 className='text-3xl font-bold text-center text-white mb-8'>
+						See Code Canvas in Action
+					</h2>
+					<p className='text-xl text-blue-100 text-center mb-10 max-w-3xl mx-auto'>
+						Watch how our collaborative platform helps developers practice whiteboard
+						interviews in real-time.
+					</p>
+					<div className='video-container bg-white p-3 md:p-5 rounded-xl shadow-2xl mx-auto max-w-4xl'>
+						<div className='relative'>
+							{/* Video control bar styling similar to the code editor above */}
+							<div className='absolute top-0 left-0 w-full h-8 bg-gray-200 rounded-t-lg flex items-center px-3'>
+								<div className='flex space-x-2'>
+									<div className='w-3 h-3 rounded-full bg-red-500'></div>
+									<div className='w-3 h-3 rounded-full bg-yellow-500'></div>
+									<div className='w-3 h-3 rounded-full bg-green-500'></div>
+								</div>
+								<div className='ml-4 text-sm text-gray-600 font-medium'>
+									Code Canvas Demo
+								</div>
+							</div>
+							{/* Add padding to account for the control bar */}
+							<div className='pt-8'>
+								<video
+									className='w-full h-auto rounded-b-lg'
+									controls
+									autoPlay
+									muted
+									loop
+									src='codecanvas_cursorful-1744524196508.mp4'
+								>
+									Your browser does not support the video tag.
+								</video>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 			{/* Features Section */}
 			<div className='bg-white py-16'>
 				<div className='container mx-auto px-4'>
