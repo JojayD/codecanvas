@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import GoogleLoginButton from "@/components/ui/GoogleButtonSignIn";
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 import Image from "next/image";
+import TermsOfService from "./components/TermsOfServices";
+import PrivacyPolicy from "./components/PrivacyPolicy";
 
 export default function Home() {
 	const router = useRouter();
@@ -197,6 +199,23 @@ export default function Home() {
 					<div className='mb-4 flex justify-center'>
 						<GoogleLoginButton />
 					</div>
+				</div>
+			</div>
+			{/**Terms of Service and Privacy Policy */}
+			<div className='bg-white py-16'>
+				<div className='container mx-auto px-4 flex justify-center gap-4'>
+					<a
+						href='/policy'
+						className='text-blue-500'
+					>
+						Privacy Policy
+					</a>
+					<a
+						href='/termsofservice'
+						className='text-blue-500'
+					>
+						Terms of Service
+					</a>
 				</div>
 			</div>
 		</div>
