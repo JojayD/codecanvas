@@ -179,15 +179,11 @@ function Canvas() {
 						const data = await response.json();
 						console.log("Room status check result:", data);
 
-						// If the room is marked as closed (roomStatus: false) but we haven't detected it yet
-						//TODO: Add a check to see if the room is still active before redirecting to dashboard
 						if (data.roomStatus === false && room?.roomStatus !== false) {
 							console.log(
 								"Room closed detected via polling - redirecting to dashboard"
 							);
-							alert(
-								"This room has been closed by the host. Redirecting to dashboard."
-							);
+							alert("This room has been closed. Redirecting to dashboard.");
 							router.push("/dashboard");
 						}
 					}
@@ -198,7 +194,6 @@ function Canvas() {
 		};
 
 		// Check every 10 seconds as a fallback
-		const statusCheckInterval = setInterval(checkRoomStatus, 10000);
 
 		// Add beforeunload event listener to handle unexpected exits
 		const handleBeforeUnload = () => {
@@ -226,38 +221,6 @@ function Canvas() {
 			window.removeEventListener("beforeunload", handleBeforeUnload);
 
 			// Clear the status check interval
-			clearInterval(statusCheckInterval);
-
-			// Get environment mode for logging purposes
-			// const isDevelopment = process.env.NODE_ENV === "development";
-
-			// // Only perform leave operations (beacon and function call) in production
-			// if (!isDevelopment) {
-			// 	console.log("[PROD] Production mode - attempting to leave room on unmount");
-
-			// 	// Send beacon for reliable leaving on page close/refresh
-			// 	if (roomId && currentUser?.userId) {
-			// 		console.log("[PROD] Sending leave room beacon on unmount");
-			// 		const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}&checkForHostExit=false`;
-			// 		navigator.sendBeacon(url);
-			// 	}
-
-			// 	// Call leaveRoom function, but don't block excessively
-			// 	try {
-			// 		console.log("[PROD] Calling leaveRoom function with timeout");
-			// 		Promise.race([
-			// 			leaveRoom(false), // Pass false to avoid host exit check on unmount
-			// 			new Promise((resolve) => setTimeout(resolve, 300)),
-			// 		]).catch((err) => {
-			// 			console.error("[PROD] Error in leaveRoom during unmount:", err);
-			// 		});
-			// 	} catch (error) {
-			// 		console.error("[PROD] Error in cleanup when unmounting Canvas:", error);
-			// 	}
-			// } else {
-			// 	console.log(
-			// 		"[DEV] Development mode - skipping leave room operations on unmount.");
-			// }
 		};
 	}, [
 		leaveRoom,
@@ -284,7 +247,7 @@ function Canvas() {
 		if (isRoomClosed && !loading) {
 			console.log("Room is closed, redirecting to dashboard");
 			// Show a message about the room being closed
-			alert("This room has been closed by the host. Redirecting to dashboard.");
+			alert("This room has been closed. You'll be redirected to the dashboard.");
 			// Navigate to dashboard after a short delay
 			router.push("/dashboard");
 		}
@@ -325,58 +288,8 @@ function Canvas() {
 		try {
 			console.log(`User clicked Leave Room button`);
 
-			// Log current user and room info for debugging
-			console.log(`[LEAVE] Current user:`, currentUser);
-			console.log(`[LEAVE] Room creator info:`, {
-				roomId,
-				created_by: room?.created_by,
-				createdBy: room?.createdBy,
-			});
-			const userId = currentUser.userId;
-			// Check if this user is likely the host
-			const isLastParticipant = participants.length <= 1;
-			const isCreator =
-				room?.created_by === currentUser.userId ||
-				room?.createdBy === currentUser.userId;
-
-			console.log(
-				`[LEAVE] Host exit check - isLastParticipant: ${isLastParticipant}, isCreator: ${isCreator}`
-			);
-
-			// First, call the leaveRoom function from the context
-			// Pass true for checkForHostExit to indicate this is an intentional exit
-			// that should check if the user is a host
-			await leaveRoom(true);
-
-			// Then as a backup, also call the API endpoint directly with updated user ID format
-			if (roomId && currentUser?.userId) {
-				// Send both localStorage userId and Supabase auth ID if available
-				let authUser = null;
-				try {
-					const { data } = await supabase.auth.getUser();
-					authUser = data?.user;
-					console.log("[LEAVE] Auth user:", authUser?.id);
-				} catch (e) {
-					console.log("[LEAVE] No auth user available");
-				}
-
-				// Use the complete user ID including username if available
-				const userId = currentUser.userId;
-				const authUserId = authUser?.id;
-				console.log(`[LEAVE] Auth user ID: ${authUserId}`);
-				console.log(`[LEAVE] Calling API with userId: ${authUserId}`);
-
-				const url = `/api/leave-room?roomId=${roomId}&authUserId=${encodeURIComponent(authUserId || "")}&checkForHostExit=true`;
-				const response = await fetch(url);
-				const data = await response.json();
-
-				console.log("API leave room request completed:", data);
-
-				// Check if this was a host exit
-				if (data.wasHostExit) {
-					console.log("Host exit confirmed by API - room has been closed");
-				}
-			}
+			// Call the leaveRoom function from context
+			await leaveRoom();
 
 			// Wait a brief moment to allow Supabase to process the update
 			// before navigating away from the page
@@ -467,15 +380,6 @@ function Canvas() {
 									className='bg-red-500 hover:bg-red-700 text-white font-medium py-1 px-3 rounded'
 								>
 									Leave Room
-								</button>
-							</li>
-
-							<li>
-								<button
-									onClick={handleLogout}
-									className='hover:underline cursor-pointer'
-								>
-									Logout
 								</button>
 							</li>
 						</ul>

@@ -70,6 +70,27 @@ export async function GET(req: NextRequest) {
 		let isHost = false;
 		let matchType = "none";
 
+		// Additional ID format analysis for better debugging
+		const isLocalStorageId = userId && userId.startsWith("user-");
+		const isAuthId =
+			room.created_by &&
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+				room.created_by
+			);
+
+		console.log("[DEBUG-HOST] ID Format Analysis:", {
+			userId,
+			userId_format: isLocalStorageId ? "localStorage" : "unknown",
+			created_by: room.created_by,
+			created_by_format: isAuthId
+				? "auth_uuid"
+				: room.created_by?.startsWith("user-")
+					? "localStorage"
+					: "unknown",
+			format_mismatch:
+				isLocalStorageId !== (room.created_by?.startsWith("user-") || false),
+		});
+
 		// Safely check if room.created_by exists before comparing
 		if (room.created_by) {
 			if (authenticatedUserId && room.created_by === authenticatedUserId) {
@@ -85,11 +106,29 @@ export async function GET(req: NextRequest) {
 
 			// In deployment environment, be more lenient with host detection
 			// This special case handles the server environment where auth may not be available
-			if (isServerEnvironment && !isHost && userId && userId.startsWith("user-")) {
-				// Check if userId format matches a localStorage generated ID
-				if (room.created_by && room.created_by.startsWith("user-")) {
-					// For deployment, assume user-XXX matches if the formats are similar
-					// This helps when localStorage IDs are used
+			if (isServerEnvironment && !isHost) {
+				// Handle localStorage user ID vs Auth ID format mismatch
+				if (isLocalStorageId && isAuthId) {
+					console.log(
+						"[DEBUG-HOST] Format mismatch between localStorage user ID and Auth ID"
+					);
+
+					// If we have the created_by parameter and it matches room.created_by
+					if (created_by && created_by === room.created_by) {
+						isHost = true;
+						matchType = "param_match_with_format_difference";
+						console.log(
+							"[DEBUG-HOST] Authorized via created_by parameter match despite format mismatch"
+						);
+					}
+				}
+				// Standard localStorage ID match for server environment
+				else if (
+					userId &&
+					userId.startsWith("user-") &&
+					room.created_by &&
+					room.created_by.startsWith("user-")
+				) {
 					isHost = true;
 					matchType = "server_env_user_match";
 					console.log(

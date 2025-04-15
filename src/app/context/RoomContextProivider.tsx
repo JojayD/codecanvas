@@ -35,7 +35,7 @@ interface RoomContextType {
 	updatePrompt: (prompt: string) => Promise<void>;
 	updateLanguage: (language: string) => Promise<void>;
 	joinRoom: () => Promise<void>;
-	leaveRoom: (checkForHostExit?: boolean) => Promise<void>;
+	leaveRoom: (refresh?: boolean) => Promise<void>;
 	loading: boolean;
 	error: Error | null;
 	currentUser: { userId: string; username: string };
@@ -182,11 +182,9 @@ export const RoomProvider: React.FC<{
 					if (roomData.roomStatus === false) {
 						console.log("Room is already closed, will show alert");
 						// Show alert after a short delay
-						setTimeout(() => {
-							alert(
-								"This room has been closed by the host. You'll be redirected to the dashboard."
-							);
-						}, 1000);
+						alert(
+							"This room has been closed by the host. You'll be redirected to the dashboard."
+						);
 						setError(new Error("Room is closed"));
 						return;
 					}
@@ -298,13 +296,15 @@ export const RoomProvider: React.FC<{
 
 			// Handle room closure detected via real-time update
 			if (updatedRoom.roomStatus === false) {
-				console.log("Room was closed by host - roomStatus is false");
+				console.log("Room was closed - roomStatus is false");
 				// Set hasJoined to false since everyone has been kicked out
 				setHasJoined(false);
-				// Show an alert or notification that the room was closed by host
+				// Show an alert or notification that the room was closed
 				if (typeof window !== "undefined") {
 					// Only show alert in browser environment
-					alert("The host has left the room. The room is now closed.");
+					alert(
+						"The room has been closed. You will be redirected to the dashboard."
+					);
 
 					// If the user is not on the dashboard already, redirect them
 					if (window.location.pathname.includes("/canvas")) {
@@ -587,7 +587,7 @@ export const RoomProvider: React.FC<{
 
 	// Leave room function - memoized with useCallback
 	const leaveRoom = useCallback(
-		async (checkForHostExit: boolean = true, refresh: boolean = true) => {
+		async (refresh: boolean = true) => {
 			try {
 				if (!room) {
 					return;
@@ -597,111 +597,23 @@ export const RoomProvider: React.FC<{
 				const roomIdToUse = room.roomId || room.id;
 				console.log(`[LEAVE] Preparing to leave room ${roomIdToUse}`);
 
-				if (checkForHostExit) {
-					try {
-						// Enhanced host detection when checkForHostExit is true
+				// If room is already closed, just navigate away
+				if (room.roomStatus === false) {
+					console.log(
+						"[LEAVE] Room is already closed, skipping leave room API call"
+					);
+					setRoom(null);
+					if (refresh) router.refresh();
+					router.push("/dashboard");
 
-						// Get user ID (with and without username)
-						const userId = currentUser.userId;
-						const userName = currentUser.username;
-
-						// Try to get the created_by from room if available
-						const created_by = room.created_by || "";
-
-						// Call debug endpoint to check if user is host or last participant
-						console.log(
-							`[LEAVE] Calling debug-host-detection for roomId: ${roomIdToUse}, userId: ${userId}`
-						);
-						const response = await fetch(
-							`/api/debug-host-detection?roomId=${roomIdToUse}&userId=${userId}${created_by ? `&created_by=${created_by}` : ""}`
-						);
-
-						if (!response.ok) {
-							console.error(
-								`[LEAVE] Host detection API error: ${response.status} ${response.statusText}`
-							);
-							// IMPORTANT FIX: Don't try to force close if we can't confirm host status
-							console.log(
-								"[LEAVE] Could not confirm host status, proceeding with normal leave"
-							);
-							// Skip rest of host check and proceed with normal leave
-							throw new Error(`Failed to check host status: ${response.statusText}`);
-						}
-
-						const data = await response.json();
-						console.log("[LEAVE] Host detection results:", data);
-
-						// BUG FIX: Only close the room if the user is the host, not if they're just the last participant
-						if (data.isHost) {
-							// Removed the "|| data.isLastParticipant" condition
-							console.log("[LEAVE] User is host, closing room...");
-
-							// Use force-close-room API to close room
-							const closeResponse = await fetch("/api/force-close-room", {
-								method: "POST",
-								headers: {
-									"Content-Type": "application/json",
-									// Add authorization headers if needed
-								},
-								body: JSON.stringify({
-									roomId: roomIdToUse,
-									userId,
-									matchType: data.matchType, // Include the matchType from host detection
-								}),
-							});
-
-							if (!closeResponse.ok) {
-								console.error(
-									`[LEAVE] Force close API error: ${closeResponse.status} ${closeResponse.statusText}`
-								);
-								// IMPORTANT FIX: Handle the 403 error specifically and fall back to normal leave
-								if (closeResponse.status === 403) {
-									console.log(
-										"[LEAVE] 403 error from force-close, proceeding with normal leave"
-									);
-									// Fallback to normal leave procedure without throwing an error
-								} else {
-									throw new Error(
-										`Failed to force close room: ${closeResponse.statusText}`
-									);
-								}
-							} else {
-								const closeData = await closeResponse.json();
-								console.log("[LEAVE] Force close result:", closeData);
-
-								if (closeData.success) {
-									// Delay navigation to ensure other clients get the update
-									setTimeout(() => {
-										setRoom(null);
-										if (refresh) router.refresh();
-										router.push("/dashboard");
-
-										// Clear local storage data
-										cleanupLocalStorage();
-									}, 500);
-									return; // Exit early if room closed
-								}
-							}
-						} else if (data.isLastParticipant) {
-							console.log(
-								"[LEAVE] User is last participant but not host, proceeding with normal leave"
-							);
-						} else {
-							console.log(
-								"[LEAVE] User is not host and not last participant, proceeding with normal leave"
-							);
-						}
-					} catch (error) {
-						console.error("[LEAVE] Error in host exit check:", error);
-						// Continue with normal leave procedure if host check fails
-					}
+					// Clear local storage data
+					cleanupLocalStorage();
+					return;
 				}
 
-				// Standard leave procedure if not host or host check fails
-				console.log("[LEAVE] Executing standard leave procedure for non-host");
+				// Standard leave procedure
+				console.log("[LEAVE] Executing standard leave procedure");
 
-				// CRITICAL FIX: Use the leave-room API endpoint and wait for response
-				// before navigating away
 				try {
 					// Mark that this is an intentional leave to prevent auto-join
 					setIntentionalLeave(true);
@@ -716,7 +628,6 @@ export const RoomProvider: React.FC<{
 						headers: { "Content-Type": "application/json" },
 						body: JSON.stringify({
 							userId: currentUser.userId,
-							checkForHostExit: false, // Explicitly indicate non-host leave
 						}),
 					});
 
@@ -729,8 +640,7 @@ export const RoomProvider: React.FC<{
 					const data = await response.json();
 					console.log("[LEAVE] Leave room API response:", data);
 
-					// IMPORTANT: Add a delay to allow real-time updates to propagate
-					// This is crucial for the host to receive the update before this user leaves
+					// Add a delay to allow real-time updates to propagate
 					console.log(
 						"[LEAVE] Waiting 1000ms to allow real-time updates to propagate..."
 					);

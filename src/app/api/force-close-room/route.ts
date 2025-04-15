@@ -39,6 +39,19 @@ export async function POST(req: NextRequest) {
 			return NextResponse.json({ error: "Room not found" }, { status: 404 });
 		}
 
+		// If room is already closed, return success immediately
+		if (room.roomStatus === false) {
+			console.log(
+				`[FORCE-CLOSE] Room ${roomId} is already closed, returning success`
+			);
+			return NextResponse.json({
+				success: true,
+				message: "Room was already closed",
+				roomId,
+				alreadyClosed: true,
+			});
+		}
+
 		console.log(`[FORCE-CLOSE] Room found:`, {
 			id: room.id,
 			roomId: room.roomId,
@@ -46,6 +59,7 @@ export async function POST(req: NextRequest) {
 			participants: Array.isArray(room.participants)
 				? room.participants.length
 				: 0,
+			roomStatus: room.roomStatus,
 		});
 
 		// Determine if we're running in server environment (deployment)
@@ -60,7 +74,34 @@ export async function POST(req: NextRequest) {
 			// 1. Direct match of userId with room.created_by
 			// 2. OR check if a valid matchType was provided from debug-host-detection
 			// 3. Special case for server environments
-			const directMatch = room.created_by === userId;
+
+			// Enhanced direct match check that considers various user ID formats
+			let directMatch = false;
+
+			// Basic exact match
+			if (room.created_by === userId) {
+				directMatch = true;
+				console.log(
+					"[FORCE-CLOSE] Direct exact match found between userId and created_by"
+				);
+			}
+
+			// Check if the userId is from localStorage but created_by is a UUID (auth ID)
+			// In this case, we need to verify with matchType since we can't directly compare
+			const isLocalStorageId = userId && userId.startsWith("user-");
+			const isAuthId =
+				room.created_by &&
+				/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+					room.created_by
+				);
+
+			if (isLocalStorageId && isAuthId) {
+				console.log(
+					"[FORCE-CLOSE] Different ID formats detected: localStorage user vs auth ID"
+				);
+				// In this case, we must rely on matchType from debug-host-detection
+			}
+
 			const matchTypeAuth =
 				matchType === "auth_id_match" ||
 				matchType === "user_id_match" ||
@@ -74,11 +115,11 @@ export async function POST(req: NextRequest) {
 				userId &&
 				userId.startsWith("user-") &&
 				room.created_by &&
-				room.created_by.startsWith("user-")
+				(room.created_by.startsWith("user-") || isAuthId)
 			) {
 				serverEnvironmentMatch = true;
 				console.log(
-					"[FORCE-CLOSE] Special server environment match for localStorage IDs"
+					"[FORCE-CLOSE] Special server environment match for localStorage IDs or auth IDs"
 				);
 			}
 
@@ -90,7 +131,9 @@ export async function POST(req: NextRequest) {
 				serverEnvironmentMatch,
 				matchType,
 				userId,
+				isLocalStorageId,
 				created_by: room.created_by,
+				isAuthId,
 				isAuthorized,
 				environment: isServerEnvironment ? "server" : "browser",
 			});

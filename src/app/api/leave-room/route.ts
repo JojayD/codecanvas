@@ -1,71 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { leaveRoom, handleHostExit } from "@/lib/supabaseRooms";
-import { auth } from "../../../../amplify/auth/resource";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { leaveRoom } from "@/lib/supabaseRooms";
 
-// Support both GET and POST methods for flexibility
-export async function GET(request: NextRequest) {
-	return handleLeaveRoom(request);
+// Define types for the request body
+interface LeaveRoomRequestBody {
+	roomId?: string;
+	userId?: string;
 }
 
-export async function POST(request: NextRequest) {
-	return handleLeaveRoom(request);
-}
-
-async function handleLeaveRoom(request: NextRequest) {
+export async function POST(req: NextRequest) {
 	try {
-		// Extract roomId and userId from query parameters or body
-		let roomId, userId, checkForHostExit;
+		console.log("Leave room API called");
 
-		// Get body data for POST requests
-		let bodyData: {
-			roomId?: string | number;
-			userId?: string;
-			checkForHostExit?: boolean;
-		} = {};
-		if (request.method === "POST") {
-			try {
-				bodyData = await request.json();
-				console.log("POST body received:", bodyData);
-			} catch (e) {
-				console.error("Failed to parse POST body:", e);
-			}
+		// Get body data with proper typing
+		let bodyData: LeaveRoomRequestBody = {};
+
+		try {
+			bodyData = (await req.json()) as LeaveRoomRequestBody;
+			console.log("POST body received:", bodyData);
+		} catch (e) {
+			console.error("Failed to parse POST body:", e);
+			return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 		}
 
-		if (request.method === "POST" && Object.keys(bodyData).length > 0) {
-			// Extract from POST body if available
-			roomId = bodyData.roomId;
-			userId = bodyData.userId;
-			checkForHostExit = bodyData.checkForHostExit === true;
-
-			console.log("Extracted from POST body:", {
-				roomId,
-				userId,
-				checkForHostExit,
-			});
-		} else {
-			// Fall back to query parameters
-			const searchParams = request.nextUrl.searchParams;
-			roomId = searchParams.get("roomId");
-			userId = searchParams.get("userId");
-			checkForHostExit = searchParams.get("checkForHostExit") === "true";
-
-			console.log("Extracted from query params:", {
-				roomId,
-				userId,
-				checkForHostExit,
-			});
-		}
-
-		// Extract roomId from URL path if not provided in query/body
-		if (!roomId) {
-			const urlParts = request.nextUrl.pathname.split("/");
-			const lastPart = urlParts[urlParts.length - 1];
-			if (lastPart && lastPart !== "leave-room") {
-				roomId = lastPart;
-				console.log("Extracted roomId from URL path:", roomId);
-			}
-		}
+		// Extract parameters
+		const roomId = bodyData.roomId || "";
+		const userId = bodyData.userId || "";
 
 		// Validate parameters
 		if (!roomId || !userId) {
@@ -75,51 +34,19 @@ async function handleLeaveRoom(request: NextRequest) {
 			);
 		}
 
-		// Get room information for validation
-		const { data: room, error: roomError } = await supabase
-			.from("rooms")
-			.select("*")
-			.eq("roomId", roomId)
-			.single();
-
-		if (roomError) {
-			return NextResponse.json({ error: "Room not found" }, { status: 404 });
-		}
-
-		// If checkForHostExit is true, explicitly call handleHostExit first
-		if (checkForHostExit) {
-			console.log("Checking if user is the host before leaving");
-
-			// Try to process host exit first - this now uses our fixed logic
-			const hostExitResult = await handleHostExit(roomId, userId);
-
-			if (hostExitResult) {
-				console.log("Host exit detected - room has been closed");
-				return NextResponse.json(
-					{
-						success: true,
-						message: "Room closed - host has left",
-						wasHostExit: true,
-					},
-					{ status: 200 }
-				);
-			}
-		}
-
-		// Call the leaveRoom function to update the database
-		// Pass false for checkForHostExit since we've already done that check above
-		console.log(`Removing user ${userId} from room ${roomId} participants list`);
-		const result = await leaveRoom(roomId, userId, false);
+		// Call the simplified leaveRoom function
+		const result = await leaveRoom(roomId, userId);
 
 		if (result) {
-			// Double-check if the room was closed (which would happen only if the host left)
-			const wasHostExit =
+			// Check if the room was closed (no participants left)
+			const roomClosed =
 				result.roomStatus === false &&
-				Array.isArray(result.participants) &&
-				result.participants.length === 0;
+				(!result.participants ||
+					!Array.isArray(result.participants) ||
+					result.participants.length === 0);
 
 			console.log("Leave room result:", {
-				wasHostExit,
+				roomClosed,
 				roomStatus: result.roomStatus,
 				participantsCount: Array.isArray(result.participants)
 					? result.participants.length
@@ -130,10 +57,10 @@ async function handleLeaveRoom(request: NextRequest) {
 			return NextResponse.json(
 				{
 					success: true,
-					message: wasHostExit
-						? "Room closed - host has left"
+					message: roomClosed
+						? "Room closed - no participants left"
 						: "Successfully left room",
-					wasHostExit,
+					roomClosed,
 					participants: result.participants,
 				},
 				{ status: 200 }
