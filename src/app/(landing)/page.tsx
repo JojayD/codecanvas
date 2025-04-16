@@ -6,6 +6,7 @@ import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 import Image from "next/image";
 import TermsOfService from "./components/TermsOfServices";
 import PrivacyPolicy from "./components/PrivacyPolicy";
+import Header from "./components/Header";
 
 export default function Home() {
 	const router = useRouter();
@@ -63,6 +64,9 @@ export default function Home() {
 
 	return (
 		<div className='flex flex-col min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100'>
+			<div>
+				<Header />
+			</div>
 			{/* Hero Section */}
 			<div className='container mx-auto px-4 py-16 md:py-24'>
 				<div className='flex flex-col md:flex-row items-center'>
@@ -190,7 +194,7 @@ export default function Home() {
 			</div>
 
 			{/* Call to Action */}
-			<div className='py-16 bg-blue-600 text-white mt-auto'>
+			<div className='py-16 bg-gradient-to-r from-blue-600 to-indigo-700 text-white mt-auto'>
 				<div className='container mx-auto px-4 text-center '>
 					<h2 className='text-3xl font-bold mb-6'>Ready to start coding?</h2>
 					<p className='text-xl mb-8 max-w-2xl mx-auto'>
