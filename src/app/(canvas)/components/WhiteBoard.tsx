@@ -239,7 +239,7 @@ const WhiteBoard = () => {
 
 			return newContent;
 		});
-	};
+					};
 
 	// Handle shape deletion
 	const handleDeleteShape = async (id: string) => {

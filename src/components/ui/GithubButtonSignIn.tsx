@@ -1,12 +1,12 @@
-// components/GoogleLoginButton.tsx
+// src/components/ui/GithubButtonSignIn.tsx
 import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import Image from "next/image";
 import { useState } from "react";
-import { FaGoogle } from "react-icons/fa";
-
-export default function GoogleLoginButton() {
+import { FaGithub } from "react-icons/fa";
+export default function GitHubLoginButton() {
 	const [isLoading, setIsLoading] = useState(false);
 
-	const signInWithGoogle = async () => {
+	const signInWithGitHub = async () => {
 		setIsLoading(true);
 
 		try {
@@ -16,13 +16,13 @@ export default function GoogleLoginButton() {
 			}
 
 			const { error } = await supabase.auth.signInWithOAuth({
-				provider: "google",
+				provider: "github",
 			});
 			if (error) {
 				console.error("Error signing in:", error.message);
 			}
 		} catch (err) {
-			console.error("Google sign-in error:", err);
+			console.error("GitHub sign-in error:", err);
 			alert("Unable to sign in at this time. Please try again later.");
 		} finally {
 			setIsLoading(false);
@@ -31,16 +31,16 @@ export default function GoogleLoginButton() {
 
 	return (
 		<button
-			onClick={signInWithGoogle}
+			onClick={signInWithGitHub}
 			disabled={isLoading}
 			className='relative flex items-center justify-center gap-2 w-full px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-lg shadow-md transition-colors disabled:opacity-70'
 		>
 			{isLoading ? (
 				<div className='w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
 			) : (
-				<FaGoogle size={20} />
+				<FaGithub size={20} />
 			)}
-			<span>{isLoading ? "Signing in..." : "Sign in with Google"}</span>
+			<span>{isLoading ? "Signing in..." : "Sign in with GitHub"}</span>
 		</button>
 	);
 }
