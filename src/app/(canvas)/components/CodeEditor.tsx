@@ -20,6 +20,7 @@ type EditorProps = {
 	onChange?: (value: string | undefined) => void;
 	disableAutocomplete?: boolean;
 	onLanguageChange?: (language: string) => void;
+	height?: string;
 };
 
 const CodeEditor = ({
@@ -275,7 +276,7 @@ const CodeEditor = ({
 	}
 
 	return (
-		<div className='h-[600px] w-full border border-gray-300 rounded flex flex-col'>
+		<div className='w-full h-full border border-gray-300 rounded flex flex-col'>
 			<div className='flex justify-between items-center p-2 bg-gray-100'>
 				<ChoiceEditor
 					selectedLanguage={currentLang}

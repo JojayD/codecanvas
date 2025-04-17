@@ -458,7 +458,7 @@ function Canvas() {
 
 			{/* Last update timestamp (always visible) */}
 			<div className='bg-gray-700 text-gray-300 px-4 py-1 text-xs'>
-				{lastUpdate || "Connecting..."}
+				{lastUpdate || ""}
 			</div>
 
 			<div
