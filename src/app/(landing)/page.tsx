@@ -69,7 +69,7 @@ export default function Home() {
 			</div>
 			{/* Hero Section */}
 			<div className='container mx-auto px-4 py-16 md:py-24'>
-				<div className='flex flex-col md:flex-row items-center'>
+				<div className='flex flex-col md:flex-row items-center justify-center gap-8'>
 					<div className='md:w-1/2 mb-10 md:mb-0'>
 						<h1 className='text-4xl md:text-5xl font-bold text-blue-900 mb-4'>
 							Code Canvas
@@ -82,8 +82,23 @@ export default function Home() {
 							through real-time code collaboration, making it easier to practice,
 							learn, and teach coding interview skills.
 						</p>
-						<div className='flex flex-col sm:flex-row gap-4'>
-							<GoogleLoginButton />
+						<div className='flex flex-col justify-center items-center sm:flex-row gap-4'>
+							<button
+								onClick={() => router.push("/login")}
+								className='
+								px-6
+								py-3
+								bg-gradient-to-r
+								from-blue-600
+								to-indigo-700
+								text-white
+								font-semibold
+								rounded-lg		
+								shadow-lg
+								hover:opacity-90'
+							>
+								Get Started
+							</button>
 						</div>
 					</div>
 					<div className='md:w-1/2 flex justify-center'>

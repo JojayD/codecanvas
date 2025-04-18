@@ -133,7 +133,7 @@ export default function Dashboard() {
 			<main className='flex-grow flex items-center justify-center p-8'>
 				<div className='bg-white rounded-2xl shadow-xl overflow-hidden max-w-4xl w-full grid md:grid-cols-2 gap-0'>
 					{/* Left panel with illustration/graphics */}
-					<div className='bg-gradient-to-br from-blue-600 to-indigo-700 p-8 flex flex-col justify-center items-center text-white hidden md:flex'>
+					<div className='bg-gradient-to-br from-blue-600 to-indigo-700 p-8 flex flex-col justify-center items-center text-white'>
 						<div className='mb-6'>
 							<Image
 								src='/WhiteboardIcon.png'
