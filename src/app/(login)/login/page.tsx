@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import GoogleLoginButton from "@/components/ui/GoogleButtonSignIn";
 import GithubLoginButton from "@/components/ui/GithubButtonSignIn";
@@ -15,14 +15,21 @@ export default function LoginPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const handleEmailLogin = async (e: React.FormEvent) => {
+	const handleSignUp = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setLoading(true);
 		setError(null);
-		const { error } = await supabase.auth.signInWithPassword({ email, password });
+		const { error } = await supabase.auth.signInWithOtp({
+			email,
+			options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` },
+		});
+
 		setLoading(false);
-		if (error) setError(error.message);
-		else router.push("/dashboard");
+		if (error) {
+			setError(error.message);
+		} else {
+			router.push("/auth/check-email");
+		}
 	};
 
 	const handleOAuth = async (provider: "google" | "github") => {
@@ -36,6 +43,15 @@ export default function LoginPage() {
 		<div className='min-h-screen flex'>
 			{/* Left Panel */}
 			<div className='w-1/2 bg-blue-800 flex flex-col items-center justify-center text-white p-12'>
+				<Button
+					style={{ cursor: "pointer" }}
+					className='absolute top-4 left-4 bg-white text-black px-4 py-2 rounded-lg hover:bg-gradient-to-r hover:from-yellow-400 hover:to-orange-500'
+					onClick={() => {
+						router.push("/"); // Check if this logs when clicked
+					}}
+				>
+					Back
+				</Button>
 				<div className='relative w-64 h-64 mb-8'>
 					<Image
 						src='/boycoding.png'
@@ -50,6 +66,7 @@ export default function LoginPage() {
 
 			{/* Right Panel */}
 			<div className='w-1/2 flex items-center justify-center p-12 bg-white'>
+				<div className='absolute top-0 left-0 p-4'></div>
 				<div className='w-full max-w-md space-y-6'>
 					<h1 className='text-2xl font-semibold text-gray-800 text-center'>
 						Welcome
@@ -57,7 +74,7 @@ export default function LoginPage() {
 					{error && <div className='text-red-600 text-center'>{error}</div>}
 
 					<form
-						onSubmit={handleEmailLogin}
+						onSubmit={handleSignUp}
 						className='space-y-4'
 					>
 						<div>
@@ -78,32 +95,10 @@ export default function LoginPage() {
 								disabled={loading}
 							/>
 						</div>
-						<div>
-							<label
-								htmlFor='password'
-								className='sr-only'
-							>
-								Password
-							</label>
-							<input
-								id='password'
-								type='password'
-								placeholder='Password'
-								required
-								className='w-full px-4 py-2 border rounded-lg focus:ring focus:outline-none'
-								value={password}
-								onChange={(e) => setPassword(e.target.value)}
-								disabled={loading}
-							/>
-							<div className='text-right mt-1'>
-								<a
-									href='/auth/reset'
-									className='text-sm text-blue-600 hover:underline'
-								>
-									Forgot password?
-								</a>
-							</div>
-						</div>
+						<p className='text-sm text-gray-600 mb-4 text-center'>
+							We'll send you a magic link to sign up. No password needed!
+						</p>
+
 						<button
 							type='submit'
 							className='w-full py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 disabled:opacity-50'

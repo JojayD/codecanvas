@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import GoogleLoginButton from "@/components/ui/GoogleButtonSignIn";
 import GithubLoginButton from "@/components/ui/GithubButtonSignIn";
@@ -36,6 +36,15 @@ export default function SignUpPage() {
 		<div className='min-h-screen flex'>
 			{/* Left Panel */}
 			<div className='w-1/2 bg-blue-800 flex flex-col items-center justify-center text-white p-12'>
+				<Button
+					style={{ cursor: "pointer" }}
+					className='absolute top-4 left-4 bg-white text-black px-4 py-2 rounded-lg hover:bg-gradient-to-r hover:from-yellow-400 hover:to-orange-500'
+					onClick={() => {
+						router.push("/"); // Check if this logs when clicked
+					}}
+				>
+					Back
+				</Button>
 				<div className='relative w-64 h-64 mb-8'>
 					<Image
 						src='/boycoding.png'
