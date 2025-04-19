@@ -7,7 +7,7 @@ import Image from "next/image";
 import TermsOfService from "./components/TermsOfServices";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import Header from "./components/Header";
-
+import { Button } from "@/components/ui/button";
 export default function Home() {
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(true);
@@ -84,6 +84,7 @@ export default function Home() {
 						</p>
 						<div className='flex flex-col justify-center items-center sm:flex-row gap-4'>
 							<button
+								style={{ cursor: "pointer" }}
 								onClick={() => router.push("/login")}
 								className='
 								px-6
@@ -113,15 +114,14 @@ export default function Home() {
 							<div className='pt-7 px-4 h-full overflow-hidden font-mono text-sm'>
 								<pre className='text-gray-800'>
 									<code>
-										{`def greet() {
-		print("Welcome to Code Canvas!");
-	}
-
+										{
+					`def greet():	
+	print("Welcome to Code Canvas!")
 	// Real-time collaboration
 	// Code sharing
 	// And much more...
 
-	greet();`}
+greet()`}
 									</code>
 								</pre>
 							</div>
@@ -216,7 +216,13 @@ export default function Home() {
 						Join Code Canvas to practice coding with your friends and teammates.
 					</p>
 					<div className='mb-4 flex justify-center'>
-						<GoogleLoginButton />
+						<Button
+							style={{ cursor: "pointer" }}
+							onClick={() => router.push("/login")}
+							className='bg-white text-black px-4 py-2 rounded-lg hover:bg-white hover:opacity-85'
+						>
+							Get Started
+						</Button>
 					</div>
 				</div>
 			</div>
