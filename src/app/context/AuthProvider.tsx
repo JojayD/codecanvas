@@ -1,9 +1,7 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import {
-	supabase,
-	checkAndRefreshAuth,
-} from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
+import { checkAndRefreshAuth } from "@/app/utils/supabase/client";
 import { Session } from "@supabase/supabase-js";
 
 // Define the Authentication context shape

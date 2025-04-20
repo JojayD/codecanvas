@@ -6,7 +6,7 @@ import { RoomProvider, useRoom } from "@/app/context/RoomContextProivider";
 import { SplitPane } from "@rexxars/react-split-pane";
 import dynamic from "next/dynamic";
 import Prompt from "../components/Prompt";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import React from "react";
 import { withAuthProtection } from "@/app/context/AuthProvider";
 

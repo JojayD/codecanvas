@@ -6,10 +6,8 @@ import ChoiceEditor from "@/app/(canvas)/components/ChoiceEditor";
 import { debounce } from "lodash";
 import { v4 as uuidv4 } from "uuid";
 import { Session } from "@supabase/supabase-js";
-import {
-	supabase,
-	checkAndRefreshAuth,
-} from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
+import { checkAndRefreshAuth } from "@/app/utils/supabase/client";
 import { useAuth } from "@/app/context/AuthProvider";
 
 type EditorProps = {

@@ -1,4 +1,4 @@
-import { supabase } from "../app/utils/supabase/lib/supabaseClient";
+import { createClient } from "../app/utils/supabase/client";
 
 export interface Room {
 	id: string;
@@ -76,4 +76,4 @@ export interface UpdateRoomPayload {
 	roomStatus?: boolean;
 }
 
-export { supabase };
+export const supabase = createClient();

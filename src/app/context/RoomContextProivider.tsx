@@ -19,7 +19,7 @@ import {
 	closeRoom as closeRoomSupabase,
 } from "@/lib/supabaseRooms";
 import { Room, Room as SupabaseRoom } from "@/lib/supabase";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 

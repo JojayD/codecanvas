@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leaveRoom } from "@/lib/supabaseRooms";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 
 // Define types for the request body
 interface LeaveRoomRequestBody {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 		const pathSegments = url.pathname.split("/");
 		const roomId = pathSegments[pathSegments.length - 1];
 
-		console.log(`Leave room API activated for roomId: ${roomId}`);
+		console.log(`[[route.ts]]Leave room API activated for roomId: ${roomId}, and type of roomId: ${typeof roomId}`);
 
 		// Get body data with proper typing
 		let bodyData: LeaveRoomRequestBody = {};
@@ -43,11 +43,15 @@ export async function POST(req: NextRequest) {
 		const { data: room, error: roomError } = await supabase
 			.from("rooms")
 			.select("*")
-			.eq("roomId", roomId)
+			.eq("roomId", parseInt(roomId))
 			.single();
 
+
+			if (room){
+				console.log("[route.ts] Room found: ", room);
+			}
 		if (roomError) {
-			console.error(`Room not found error: ${roomError.message}`);
+			console.error(`[[route.ts]]Room not found error: ${roomError.message}`);
 			return NextResponse.json(
 				{
 					error: "Room not found",

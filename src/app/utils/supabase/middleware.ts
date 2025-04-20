@@ -1,83 +1,88 @@
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import { type CookieOptions } from "@supabase/ssr";
 
-// Define public routes that don't require authentication
-const publicRoutes = ["/login", "/auth", "/register", "/reset-password", "/"];
+const protectedRoutes = ["/dashboard"];
+const unauthenticatedRoutes = [
+	"/login",
+	"/policy",
+	"/termsofservice",
+	"/about",
+];
+// Auth-related routes that should bypass protection checks
 
-export async function updateSession(request: NextRequest) {
-	// Check if the current route is public and doesn't need authentication
-	const isPublicRoute = publicRoutes.some((route) =>
-		request.nextUrl.pathname.startsWith(route)
-	);
-
-	let supabaseResponse = NextResponse.next({
-		request,
-	});
-
-	const supabase = createServerClient(
-		process.env.NEXT_PUBLIC_SUPABASE_URL!,
-		process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-		{
-			cookies: {
-				getAll() {
-					return request.cookies.getAll();
-				},
-				setAll(cookiesToSet) {
-					cookiesToSet.forEach(({ name, value, options }) =>
-						request.cookies.set(name, value)
-					);
-					supabaseResponse = NextResponse.next({
-						request,
-					});
-					cookiesToSet.forEach(({ name, value, options }) =>
-						supabaseResponse.cookies.set(name, value, options)
-					);
-				},
+export const updateSession = async (request: NextRequest) => {
+	// This `try/catch` block is only here for the interactive tutorial.
+	// Feel free to remove once you have Supabase connected.
+	try {
+		// Create an unmodified response
+		let response = NextResponse.next({
+			request: {
+				headers: request.headers,
 			},
-		}
-	);
+		});
 
-	// Do not run code between createServerClient and
-	// supabase.auth.getUser(). A simple mistake could make it very hard to debug
-	// issues with users being randomly logged out.
-
-	// IMPORTANT: DO NOT REMOVE auth.getUser()
-
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-
-	// If user is not authenticated and trying to access a protected route,
-	// redirect to login page
-	if (!user && !isPublicRoute) {
-		console.log(
-			`Unauthenticated access to ${request.nextUrl.pathname}. Redirecting to login.`
+		const supabase = createServerClient(
+			process.env.NEXT_PUBLIC_SUPABASE_URL!,
+			process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+			{
+				cookies: {
+					getAll() {
+						return request.cookies.getAll();
+					},
+					setAll(
+						cookiesToSet: { name: string; value: string; options?: CookieOptions }[]
+					) {
+						cookiesToSet.forEach(({ name, value }) =>
+							request.cookies.set(name, value)
+						);
+						response = NextResponse.next({
+							request,
+						});
+						cookiesToSet.forEach(({ name, value, options }) =>
+							response.cookies.set(name, value, options)
+						);
+					},
+				},
+			}
 		);
-		const url = request.nextUrl.clone();
-		url.pathname = "/login";
-		return NextResponse.redirect(url);
+
+		// This will refresh session if expired - required for Server Components
+		// https://supabase.com/docs/guides/auth/server-side/nextjs
+		const user = await supabase.auth.getUser();
+		// protected routes
+		if (
+			protectedRoutes.some((route) =>
+				request.nextUrl.pathname.startsWith(route)
+			) &&
+			user.error
+		) {
+			return NextResponse.redirect(new URL("/", request.url));
+		}
+
+		// only unauthenticated users should be able to view these routes
+		if (
+			unauthenticatedRoutes.some((route) =>
+				request.nextUrl.pathname.startsWith(route)
+			) &&
+			!user.error
+		) {
+			return NextResponse.redirect(new URL("/", request.url));
+		}
+		// Auto redirect to lockin page if the user is signed in
+		if (request.nextUrl.pathname === "/" && !user.error) {
+			return NextResponse.redirect(new URL("/", request.url));
+		}
+
+		return response;
+	} catch (e) {
+		// If you are here, a Supabase client could not be created!
+		// This is likely because you have not set up environment variables.
+		// Check out http://localhost:3000 for Next Steps.
+		return NextResponse.next({
+			request: {
+				headers: request.headers,
+			},
+		});
 	}
-
-	// If user is authenticated but trying to access login page,
-	// redirect to dashboard
-	if (user && request.nextUrl.pathname === "/login") {
-		const url = request.nextUrl.clone();
-		url.pathname = "/dashboard";
-		return NextResponse.redirect(url);
-	}
-
-	// IMPORTANT: You *must* return the supabaseResponse object as it is.
-	// If you're creating a new response object with NextResponse.next() make sure to:
-	// 1. Pass the request in it, like so:
-	//    const myNewResponse = NextResponse.next({ request })
-	// 2. Copy over the cookies, like so:
-	//    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-	// 3. Change the myNewResponse object to fit your needs, but avoid changing
-	//    the cookies!
-	// 4. Finally:
-	//    return myNewResponse
-	// If this is not done, you may be causing the browser and server to go out
-	// of sync and terminate the user's session prematurely!
-
-	return supabaseResponse;
-}
+};

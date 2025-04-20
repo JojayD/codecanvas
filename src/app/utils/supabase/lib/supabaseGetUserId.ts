@@ -1,4 +1,4 @@
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 
 /**
  * Get the current user's UUID from Supabase auth
@@ -12,7 +12,10 @@ export async function getUserId(): Promise<string | null> {
 			console.error("Error retrieving session:", error);
 			return null;
 		}
-		console.log("\n\nHERE IS THE DATA from trying function getUserId\n\n", data.session?.user.id);
+		console.log(
+			"\n\nHERE IS THE DATA from trying function getUserId\n\n",
+			data.session?.user.id
+		);
 		if (data?.session) {
 			return data.session.user.id; // This is the UUID
 		}

@@ -1,4 +1,4 @@
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/app/utils/supabase/client";
 
 /**
  * Set the user's active room - ensure a user can only be in one room at a time
@@ -9,9 +9,8 @@ import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
 export async function setUserActiveRoom(
 	userId: string,
 	roomId: string | number | null,
-	createdAt?: string,
+	createdAt?: string
 ): Promise<boolean> {
-
 	console.log("Setting user active room:", userId, roomId, createdAt);
 	try {
 		if (!userId) {
@@ -20,7 +19,7 @@ export async function setUserActiveRoom(
 		}
 
 		// Check if user profile exists
-	const { data: existingProfile } = await supabase
+		const { data: existingProfile } = await supabase
 			.from("user_profiles")
 			.select("*")
 			.eq("user_id", userId)

@@ -1,5 +1,5 @@
 import React, { createContext, useState, useCallback, useEffect } from "react";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 
 export const RoomContext = createContext<any>(null);
 

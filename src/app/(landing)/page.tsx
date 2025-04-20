@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import GoogleLoginButton from "@/components/ui/GoogleButtonSignIn";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import TermsOfService from "./components/TermsOfServices";
 import PrivacyPolicy from "./components/PrivacyPolicy";
@@ -114,8 +114,7 @@ export default function Home() {
 							<div className='pt-7 px-4 h-full overflow-hidden font-mono text-sm'>
 								<pre className='text-gray-800'>
 									<code>
-										{
-					`def greet():	
+										{`def greet():	
 	print("Welcome to Code Canvas!")
 	// Real-time collaboration
 	// Code sharing

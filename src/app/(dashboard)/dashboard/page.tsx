@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createRoom } from "@/lib/supabaseRooms";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { getUserName } from "@/app/utils/supabase/lib/supabaseGetUserName";
 import { getUserId } from "@/app/utils/supabase/lib/supabaseGetUserId";
 import Image from "next/image";

@@ -125,23 +125,14 @@
 // 	} as any;
 // }
 // supabaseClient.ts
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-	throw new Error("Missing Supabase configuration.");
+import { createBrowserClient } from "@supabase/ssr";
+import { supabase } from "@/lib/supabase";
+export function createClient() {
+	return createBrowserClient(
+		process.env.NEXT_PUBLIC_SUPABASE_URL!,
+		process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+	);
 }
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-	auth: {
-		persistSession: true,
-		autoRefreshToken: true,
-		detectSessionInUrl: true,
-		storageKey: "supabase.auth.token",
-	},
-});
 
 // Check and refresh authentication token
 export async function checkAndRefreshAuth() {
