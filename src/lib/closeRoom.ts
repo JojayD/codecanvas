@@ -7,12 +7,12 @@ import { supabase } from "@/lib/supabase";
 export async function closeRoomSimple(roomId: string | number): Promise<any> {
 	try {
 		console.log(`[CLOSE_ROOM_SIMPLE] Closing room ${roomId} immediately`);
-
+		const roomIdNumber = parseInt(roomId as string, 10);
 		// Try to find the room first by roomId field
 		let { data: room, error: findError } = await supabase
 			.from("rooms")
 			.select("*")
-			.eq("roomId", roomId)
+			.eq("roomId", roomIdNumber)
 			.single();
 
 		// If not found by roomId, try by id field
@@ -23,7 +23,7 @@ export async function closeRoomSimple(roomId: string | number): Promise<any> {
 			const result = await supabase
 				.from("rooms")
 				.select("*")
-				.eq("id", roomId)
+				.eq("id", roomIdNumber)
 				.single();
 
 			room = result.data;

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
 		// Get roomId from query parameters
 		const searchParams = request.nextUrl.searchParams;
 		const roomId = searchParams.get("roomId");
-
+		const roomIdNumber = parseInt(roomId || "", 10);
 		if (!roomId) {
 			return NextResponse.json(
 				{ error: "Missing roomId parameter" },
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 		const { data: room, error } = await supabase
 			.from("rooms")
 			.select("roomId, roomStatus, created_at")
-			.eq("roomId", roomId)
+			.eq("roomId", roomIdNumber)
 			.single();
 
 		if (error) {

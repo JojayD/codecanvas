@@ -39,7 +39,7 @@ const debounce = (func: Function, wait: number) => {
 const WhiteBoard = () => {
 	const { roomId } = useRoom();
 	const { refreshAuth } = useAuth();
-	const [whiteboardId, setWhiteboardId] = useState<string | null>(null);
+	const [whiteboardId, setWhiteboardId] = useState<number | null>(null);
 	const [content, setContent] = useState<WhiteboardContent>({
 		shapes: [],
 		version: 1,

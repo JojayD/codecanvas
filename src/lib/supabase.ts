@@ -1,4 +1,5 @@
 import { createClient } from "../app/utils/supabase/client";
+import type { Json } from "./database.types";
 
 export interface Room {
 	id: number;
@@ -42,12 +43,13 @@ export interface WhiteboardContent {
 }
 
 export interface Whiteboard {
-	id: string;
+	id: number;
 	room_id: number;
-	content: string;
-	created_at?: string;
-	updated_at?: string;
-	user_id?: string;
+	content: Json;
+	created_at?: string | null;
+	updated_at?: string | null;
+	user_id?: string | null;
+	created_by?: string | null;
 }
 
 export interface CreateRoomPayload {

@@ -1,6 +1,6 @@
 "use client";
-import { supabase } from "@/lib/supabase";
-import { Whiteboard, WhiteboardContent, KonvaShape } from "./supabase";
+import { supabase, Whiteboard, WhiteboardContent, KonvaShape } from "@/lib/supabase";
+import type { Json } from "./database.types";
 import { v4 as uuidv4 } from "uuid";
 
 // Initialize an empty whiteboard content
@@ -86,7 +86,7 @@ export async function getWhiteboard(
  * Update whiteboard content
  */
 export async function updateWhiteboard(
-	id: string,
+	id: number,
 	content: WhiteboardContent
 ): Promise<Whiteboard | null> {
 	try {
@@ -112,25 +112,23 @@ export async function updateWhiteboard(
 }
 
 /**
- * Parse whiteboard content from string to WhiteboardContent
+ * Parse whiteboard content from JSON to WhiteboardContent
  */
-export function parseWhiteboardContent(contentStr: string): WhiteboardContent {
+export function parseWhiteboardContent(contentJson: Json | null): WhiteboardContent {
 	try {
-		// Add validation to ensure we're working with a valid JSON string
-		if (typeof contentStr !== "string") {
-			console.warn("Content is not a string:", contentStr);
+		let parsed: any;
+		if (typeof contentJson === "string") {
+			parsed = JSON.parse(contentJson);
+		} else if (typeof contentJson === "object" && contentJson !== null) {
+			parsed = contentJson;
+		} else {
+			console.warn("Invalid whiteboard content type:", contentJson);
 			return createEmptyContent();
 		}
-
-		// Try to parse the JSON string
-		const parsed = JSON.parse(contentStr);
-
-		// Validate the parsed content has the expected structure
 		if (!parsed || !Array.isArray(parsed.shapes)) {
 			console.warn("Invalid whiteboard content structure:", parsed);
 			return createEmptyContent();
 		}
-
 		return parsed as WhiteboardContent;
 	} catch (error) {
 		console.error("Error parsing whiteboard content:", error);
@@ -142,7 +140,7 @@ export function parseWhiteboardContent(contentStr: string): WhiteboardContent {
  * Add a new shape to the whiteboard
  */
 export async function addShape(
-	whiteboardId: string,
+	whiteboardId: number,
 	shape: Omit<KonvaShape, "id">
 ): Promise<Whiteboard | null> {
 	try {
@@ -180,7 +178,7 @@ export async function addShape(
  * Update an existing shape
  */
 export async function updateShape(
-	whiteboardId: string,
+	whiteboardId: number,
 	shapeId: string,
 	updates: Partial<KonvaShape>
 ): Promise<Whiteboard | null> {
@@ -223,7 +221,7 @@ export async function updateShape(
  * Delete a shape
  */
 export async function deleteShape(
-	whiteboardId: string,
+	whiteboardId: number,
 	shapeId: string
 ): Promise<Whiteboard | null> {
 	try {
@@ -311,7 +309,7 @@ export async function deleteWhiteboardByRoomId(
  * Subscribe to whiteboard changes
  */
 export function subscribeToWhiteboardChanges(
-	whiteboardId: string,
+	whiteboardId: number,
 	callback: (whiteboard: Whiteboard) => void
 ) {
 	console.log(`Setting up whiteboard subscription for ID ${whiteboardId}`);

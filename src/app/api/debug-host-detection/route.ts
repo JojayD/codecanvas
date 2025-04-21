@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
 	try {
 		const searchParams = req.nextUrl.searchParams;
 		const roomId = searchParams.get("roomId");
+		const numberedRoomId = parseInt(roomId || "", 10);
 		const userId = searchParams.get("userId");
 		const created_by = searchParams.get("created_by");
 		const authUserId = searchParams.get("authUserId");
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 		const { data: room, error: roomError } = await supabase
 			.from("rooms")
 			.select("*")
-			.eq("roomId", roomId)
+			.eq("roomId", numberedRoomId)
 			.single();
 
 		// Check if room exists before proceeding
