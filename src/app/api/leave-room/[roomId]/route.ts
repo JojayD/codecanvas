@@ -1,108 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leaveRoom } from "@/lib/supabaseRooms";
-import { supabase } from "@/lib/supabase";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
+import { Database } from "@/lib/database.types";
+import { Room, supabase } from "@/lib/supabase";
+import { supabaseAdmin } from '@/lib/supabaseAdmin.server';
 
 // Define types for the request body
 interface LeaveRoomRequestBody {
-	userId?: string;
+  userId?: string;
 }
 
 // Simplified handler pattern for leaving a room
 export async function POST(req: NextRequest) {
-	try {
-		// Extract roomId from URL path segments
-		const url = new URL(req.url);
-		const pathSegments = url.pathname.split("/");
-		const roomId = pathSegments[pathSegments.length - 1];
+  try {
+    // First get the room ID from the URL
+    const url = new URL(req.url);
+    const pathSegments = url.pathname.split("/");
+    const roomId = pathSegments[pathSegments.length - 1];
+    const roomIdNumber = parseInt(roomId, 10);
 
-		console.log(`[[route.ts]]Leave room API activated for roomId: ${roomId}, and type of roomId: ${typeof roomId}`);
+    console.log(`[[route.ts]]Leave room API activated for roomId: ${roomId}`);
+    console.log({ rawUrl: req.url, extractedRoomId: roomId, parsed: parseInt(roomId) });
 
-		// Get body data with proper typing
-		let bodyData: LeaveRoomRequestBody = {};
+    // Get body data
+    const bodyData = await req.json();
+    const userId = bodyData.userId || "";
+    console.log("POST body received:", bodyData);
 
-		try {
-			bodyData = (await req.json()) as LeaveRoomRequestBody;
-			console.log("POST body received:", bodyData);
-		} catch (e) {
-			console.error("Failed to parse POST body:", e);
-			return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-		}
+    // Get room data with the authenticated client
+    const { data: room, error: roomError } = await supabaseAdmin
+      .from("rooms")
+      .select("*")
+      .eq("roomId", roomIdNumber)
+      .single();
 
-		// Extract user ID
-		const userId = bodyData.userId || "";
+    if (roomError) {
+      console.error(`[[route.ts]]Room not found error: ${roomError.message}`);
+      return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    }
+    
+    console.log("Room data:", room);
 
-		// Validate parameters
-		if (!roomId || !userId) {
-			return NextResponse.json(
-				{ error: "Missing required parameters: roomId and userId" },
-				{ status: 400 }
-			);
-		}
+    // Call the simplified leaveRoom function with a type assertion to handle database type differences
+    const result = await leaveRoom(roomId, userId, false, false, undefined, room as Room, supabase);
 
-		// Get room to check if it exists
-		const { data: room, error: roomError } = await supabase
-			.from("rooms")
-			.select("*")
-			.eq("roomId", parseInt(roomId))
-			.single();
+    if (result) {
+      // Check if the room was closed (no participants left)
+      const roomClosed =
+        result.roomStatus === false &&
+        (!result.participants ||
+          !Array.isArray(result.participants) ||
+          result.participants.length === 0);
 
+      console.log("Leave room result:", {
+        roomClosed,
+        roomStatus: result.roomStatus,
+        participantsCount: Array.isArray(result.participants)
+          ? result.participants.length
+          : 0,
+        participants: result.participants,
+      });
 
-			if (room){
-				console.log("[route.ts] Room found: ", room);
-			}
-		if (roomError) {
-			console.error(`[[route.ts]]Room not found error: ${roomError.message}`);
-			return NextResponse.json(
-				{
-					error: "Room not found",
-					details: roomError.message,
-				},
-				{ status: 404 }
-			);
-		}
-
-		// Call the simplified leaveRoom function
-		const result = await leaveRoom(roomId, userId);
-
-		if (result) {
-			// Check if the room was closed (no participants left)
-			const roomClosed =
-				result.roomStatus === false &&
-				(!result.participants ||
-					!Array.isArray(result.participants) ||
-					result.participants.length === 0);
-
-			console.log("Leave room result:", {
-				roomClosed,
-				roomStatus: result.roomStatus,
-				participantsCount: Array.isArray(result.participants)
-					? result.participants.length
-					: 0,
-				participants: result.participants,
-			});
-
-			return NextResponse.json(
-				{
-					success: true,
-					message: roomClosed
-						? "Room closed - no participants left"
-						: "Successfully left room",
-					roomClosed,
-					participants: result.participants,
-				},
-				{ status: 200 }
-			);
-		} else {
-			return NextResponse.json({ error: "Failed to leave room" }, { status: 500 });
-		}
-	} catch (error) {
-		console.error("Error in leave-room API:", error);
-		return NextResponse.json(
-			{
-				error: "Internal server error",
-				details: error instanceof Error ? error.message : "Unknown error",
-			},
-			{ status: 500 }
-		);
-	}
+      return NextResponse.json(
+        {
+          success: true,
+          message: roomClosed
+            ? "Room closed - no participants left"
+            : "Successfully left room",
+          roomClosed,
+          participants: result.participants,
+        },
+        { status: 200 }
+      );
+    } else {
+      return NextResponse.json({ error: "Failed to leave room" }, { status: 500 });
+    }
+  } catch (error) {
+    console.error("Error in leave-room API:", error);
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
 }

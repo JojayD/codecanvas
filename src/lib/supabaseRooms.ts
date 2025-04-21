@@ -1,13 +1,13 @@
 import { log, time } from "console";
 import {
-	supabase,
 	Room,
 	CreateRoomPayload,
 	UpdateRoomPayload,
 } from "./supabase";
 import { createWhiteboard } from "./supabaseWhiteboard";
 import { closeRoomSimple } from "./closeRoom";
-
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import {supabase } from "./supabase";
 /**
  * Create a new room
  */
@@ -21,9 +21,10 @@ export async function createRoom(
 			roomData.roomId = Math.floor(Math.random() * 1000000);
 		}
 
+
 		const { data, error } = await supabase
 			.from("rooms") // Make sure this matches your table name exactly
-			.insert([roomData])
+			.insert(roomData as any)
 			.select()
 			.single();
 
@@ -45,7 +46,23 @@ export async function createRoom(
 			}
 		}
 
-		return data;
+		// Convert null values to undefined to match Room type
+		const roomWithProperTypes: Room = {
+			...data,
+			name: data.name || undefined,
+			description: data.description || undefined,
+			code: data.code || undefined,
+			language: data.language || undefined,
+			created_by: data.created_by || undefined,
+			participants: data.participants || undefined,
+			prompt: data.prompt || undefined,
+			updated_at: data.updated_at || undefined,
+			created_at: data.created_at || undefined,
+			roomStatus: data.roomStatus ?? undefined,
+			
+		};
+
+		return roomWithProperTypes;
 	} catch (error) {
 		console.error("Error creating room:", error);
 		return null;
@@ -55,63 +72,73 @@ export async function createRoom(
 /**
  * Get a room by ID
  */
-export async function getRoom(roomId: string | number): Promise<Room | null> {
-	try {
-		console.log(`Fetching room with roomId: ${roomId}`);
-		// Try looking up by roomId first (prioritize this)
-		let data;
-		let error;
+export async function getRoom(roomId: string | number, customClient?: any): Promise<Room | null> {
+  try {
+    console.log(`Fetching room with roomId: ${roomId}`);
+    // Try looking up by roomId first (prioritize this)
+    let data;
+    let error;
 
-		// Convert to number if it's a string
-		const roomIdNumber = typeof roomId === "string" ? parseInt(roomId) : roomId;
+    // Convert to number if it's a string
+    const roomIdNumber = typeof roomId === "string" ? parseInt(roomId) : roomId;
+    console.log(`Converted roomId to number: ${roomIdNumber}`);
+    
+    // First try with roomId field (the random number) - more secure
+    const result = await supabase
+      .from("rooms")
+      .select("*")
+      .eq("roomId", roomIdNumber)
+      .single();
 
-		// First try with roomId field (the random number) - more secure
-		const result = await supabase
-			.from("rooms")
-			.select("*")
-			.eq("roomId", roomIdNumber)
-			.single();
+    if (result.error || !result.data) {
+      console.log(
+        `No room found with roomId=${roomIdNumber}, trying id field as fallback`
+      );
 
-		if (result.error || !result.data) {
-			console.log(
-				`No room found with roomId=${roomIdNumber}, trying id field as fallback`
-			);
+      // Fall back to id field if roomId lookup fails
 
-			// Fall back to id field if roomId lookup fails
-			const altResult = await supabase
-				.from("rooms")
-				.select("*")
-				.eq("id", roomId)
-				.single();
+    } else {
+      data = result.data;
+      error = result.error;
+    }
 
-			data = altResult.data;
-			error = altResult.error;
-		} else {
-			data = result.data;
-			error = result.error;
-		}
+    if (error) throw error;
+    if (!data) throw new Error(`Room not found with roomId: ${roomId}`);
 
-		if (error) throw error;
-		if (!data) throw new Error(`Room not found with roomId: ${roomId}`);
-
-		console.log(`Room found:`, data);
-		// Log the room status specifically for debugging
-		console.log(
-			`Room status check - roomStatus: ${data.roomStatus}, created_by: ${data.created_by || data.createdBy}`
-		);
-		return data;
-	} catch (error) {
-		console.error("Error fetching room:", error);
-		return null;
-	}
+    console.log(`Room found:`, data);
+    // Log the room status specifically for debugging
+    console.log(
+      `Room status check - roomStatus: ${data.roomStatus}, created_by: ${data.created_by}`
+    );
+    
+    // Convert the database object to match Room type (convert nulls to undefined)
+    const roomWithProperTypes: Room = {
+      ...data,
+      name: data.name || undefined,
+      description: data.description || undefined,
+      code: data.code || undefined,
+      language: data.language || undefined,
+      created_by: data.created_by || undefined,
+      participants: data.participants || undefined,
+      prompt: data.prompt || undefined,
+      updated_at: data.updated_at || undefined,
+      created_at: data.created_at || undefined,
+      roomStatus: data.roomStatus ?? undefined,
+    };
+    
+    return roomWithProperTypes;
+  } catch (error) {
+    console.error("Error fetching room:", error);
+    return null;
+  }
 }
-
 /**
  * Update a room
  */
 export async function updateRoom(
 	roomId: string | number,
-	updates: UpdateRoomPayload
+	updates: UpdateRoomPayload,
+	customClient?: any
 ): Promise<Room | null> {
 	try {
 		console.log(`Updating room ${roomId} with:`, updates);
@@ -148,7 +175,7 @@ export async function updateRoom(
 		}
 
 		// Use the actual database ID for the update operation (required by Supabase)
-		const { data, error } = await supabase
+		const { data, error } = await (customClient || supabase)
 			.from("rooms")
 			.update(updates)
 			.eq("id", room.id) // Must use primary key ID for database updates
@@ -245,9 +272,10 @@ export async function joinRoom(
 		}
 
 		// Participant count check, after duplicates are filtered out
-		if (participants.length > 2) {
+		const MAX_PARTICIPANTS = 3; // Define a constant for clarity
+		if (participants.length >= MAX_PARTICIPANTS) {
 			console.log(
-				`Room ${roomId} already has ${participants.length} participants, cannot join`
+				`Room ${roomId} already has ${participants.length} participants (max: ${MAX_PARTICIPANTS}), cannot join`
 			);
 			return null; // Room already full
 		}
@@ -285,15 +313,36 @@ export async function leaveRoom(
 	userId: string,
 	isHost: boolean = false, // Parameter kept for backward compatibility
 	checkForHostExit: boolean = false, // Parameter kept for backward compatibility
-	created_by?: string // Parameter kept for backward compatibility
+	created_by?: string, // Parameter kept for backward compatibility
+	roomData?: Room,
+	customClient?: any // Add optional parameter for custom authenticated client
 ): Promise<Room | null> {
 	try {
 		console.log(
 			`[LEAVE ROOM] Attempting to leave room ${roomId} as user ${userId}`
 		);
 
-		// First get the current room data
-		const room = await getRoom(roomId);
+		// Use provided client or fall back to default
+		const client = customClient || supabase;
+
+		// First get the current room data using the provided client
+		let room = roomData;
+		if (!room) {
+			// If room data not provided, fetch it using the provided client
+			const { data, error } = await client
+				.from("rooms")
+				.select("*")
+				.eq("roomId", typeof roomId === "string" ? parseInt(roomId) : roomId)
+				.single();
+			
+			if (error) {
+				console.error("[LEAVE ROOM] Error fetching room:", error);
+				throw new Error("Room not found");
+			}
+			
+			room = data;
+		}
+		
 		if (!room) {
 			console.error("[LEAVE ROOM] Room not found:", roomId);
 			throw new Error("Room not found");
@@ -336,7 +385,7 @@ export async function leaveRoom(
 			console.log(
 				`[LEAVE ROOM] Closing room ${roomId} as it has no participants left`
 			);
-			return await closeRoom(roomId);
+			return await closeRoom(roomId, customClient);
 		}
 
 		// Otherwise, just update the participants list
@@ -345,7 +394,7 @@ export async function leaveRoom(
 		);
 		return await updateRoom(room.roomId || room.id, {
 			participants: updatedParticipants,
-		});
+		}, customClient);
 	} catch (error) {
 		console.error("Error leaving room:", error);
 		return null;
@@ -381,14 +430,23 @@ export async function deleteRoom(roomId: string | number): Promise<boolean> {
 /**
  * Close a room (mark as inactive and remove all participants)
  */
-export async function closeRoom(roomId: string | number): Promise<Room | null> {
+export async function closeRoom(
+	roomId: string | number, 
+	customClient?: any, 
+	roomData?: Room
+): Promise<Room | null> {
 	try {
 		console.log(
-			`[CLOSE ROOM] Closing room ${roomId} and removing all participants`
+			`[supabaseRooms.ts CLOSE ROOM] Closing room ${roomId} and removing all participants`
 		);
 
 		// Get the room first to determine which ID field to use
-		const room = await getRoom(roomId);
+		let room = roomData;
+		if (!room) {
+			// Only fetch the room if not provided
+			room = await getRoom(roomId);
+		}
+		
 		if (!room) {
 			console.error(
 				`[CLOSE ROOM] Cannot close - room not found with roomId: ${roomId}`
@@ -426,7 +484,7 @@ export async function closeRoom(roomId: string | number): Promise<Room | null> {
 		// Try multiple update approaches to ensure the room gets closed
 		try {
 			// First, try updating by roomId
-			const { data, error } = await supabase
+			const { data, error } = await (customClient || supabase)
 				.from("rooms")
 				.update(updateObject)
 				.eq("roomId", room.roomId)
@@ -441,7 +499,7 @@ export async function closeRoom(roomId: string | number): Promise<Room | null> {
 			}
 
 			// If that fails, try updating by the primary key id
-			const { data: data2, error: error2 } = await supabase
+			const { data: data2, error: error2 } = await (customClient || supabase)
 				.from("rooms")
 				.update(updateObject)
 				.eq("id", room.id)

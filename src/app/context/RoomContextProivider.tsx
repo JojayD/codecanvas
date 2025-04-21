@@ -21,7 +21,6 @@ import {
 import { Room, Room as SupabaseRoom } from "@/lib/supabase";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 
 type Participant = { userId: string; username: string };
 interface RoomContextType {
@@ -75,6 +74,7 @@ export const RoomProvider: React.FC<{
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<Error | null>(null);
 	const [hasJoined, setHasJoined] = useState(false);
+	const [authUser, setAuthUser] = useState<any>(null);
 	// Mock user for now - in a real app, this would come from auth
 	// Use a stable user ID for testing multiple tabs/windows
 	const [currentUser] = useState(() => {
@@ -220,6 +220,31 @@ export const RoomProvider: React.FC<{
 
 		fetchRoom();
 	}, [roomIdFromParams, currentUser.userId]);
+
+	useEffect(() => {
+		const {
+			data: { subscription },
+		} = supabase.auth.onAuthStateChange((event, session) => {
+			if (session) {
+				console.log("User authenticated:", session.user.id);
+				setAuthUser(session.user);
+			} else {
+				console.log("No authenticated user");
+				setAuthUser(null);
+			}
+		});
+
+		// Check current session on mount
+		supabase.auth.getSession().then(({ data: { session } }) => {
+			if (session) {
+				setAuthUser(session.user);
+			}
+		});
+
+		return () => {
+			subscription.unsubscribe();
+		};
+	}, []);
 
 	// Set up real-time subscription for room changes
 	useEffect(() => {

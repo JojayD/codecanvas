@@ -1,7 +1,7 @@
 import { createClient } from "../app/utils/supabase/client";
 
 export interface Room {
-	id: string;
+	id: number;
 	roomId?: number;
 	name?: string;
 	description?: string;
@@ -11,7 +11,6 @@ export interface Room {
 	updated_at?: string;
 	participants?: string[];
 	createdAt?: string;
-	createdBy?: string;
 	created_by?: string;
 	language?: string;
 	roomStatus?: boolean;
@@ -74,6 +73,7 @@ export interface UpdateRoomPayload {
 	language?: string;
 	participants?: string[];
 	roomStatus?: boolean;
+	updated_at?: string;
 }
 
 export const supabase = createClient();
