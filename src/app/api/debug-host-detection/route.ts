@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { getUserId } from "@/app/utils/supabase/lib/supabaseGetUserId";
 
 // Simplified handler pattern to avoid type issues with AWS Amplify

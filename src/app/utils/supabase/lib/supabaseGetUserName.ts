@@ -1,4 +1,4 @@
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/app/utils/supabase/client";
 import { log } from "console";
 
 export async function getUserName(): Promise<string | null> {

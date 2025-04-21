@@ -1,4 +1,4 @@
-import { supabase } from "../app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 
 /**
  * Simplified function to close a room immediately

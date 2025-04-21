@@ -1,5 +1,5 @@
 // components/GoogleLoginButton.tsx
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { useState } from "react";
 import { FaGoogle } from "react-icons/fa";
 

@@ -1,5 +1,5 @@
 // src/components/ui/GithubButtonSignIn.tsx
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import { useState } from "react";
 import { FaGithub } from "react-icons/fa";

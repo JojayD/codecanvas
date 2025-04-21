@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { closeRoom } from "@/lib/supabaseRooms";
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import {supabase} from "@/lib/supabase";
 // Initialize Supabase client
 
 // Simplified handler pattern to avoid type issues with AWS Amplify

@@ -23,7 +23,7 @@
 		"@rexxars/react-split-pane": "^1.0.0",
 		"@supabase/auth-helpers-nextjs": "^0.10.0",
 		"@supabase/ssr": "^0.6.1",
-		"@supabase/supabase-js": "^2.49.1",
+		"@supabase/supabase-js": "^2.49.4",
 		"@types/uuid": "^10.0.0",
 		"aws-amplify": "^6.13.6",
 		"axios": "^1.8.4",
@@ -58,6 +58,7 @@
 		"canvas": "^3.1.0",
 		"constructs": "^10.4.2",
 		"esbuild": "^0.25.1",
+		"supabase": "^2.20.12",
 		"tailwindcss": "^4",
 		"tsx": "^4.19.3",
 		"typescript": "^5.8.2"

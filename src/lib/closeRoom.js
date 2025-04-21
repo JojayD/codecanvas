@@ -1,7 +1,7 @@
 /**
  * A simplified version of closeRoom function for testing roomStatus updates
  */
-import { supabase } from "@/app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { getRoom } from "./supabaseRooms";
 
 export async function closeRoomSimple(roomId) {

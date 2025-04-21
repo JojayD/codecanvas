@@ -1,5 +1,5 @@
 "use client";
-import { supabase } from "../app/utils/supabase/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { Whiteboard, WhiteboardContent, KonvaShape } from "./supabase";
 import { v4 as uuidv4 } from "uuid";
 
