@@ -15,20 +15,41 @@ export default function SignUpPage() {
 	const [loading, setLoading] = useState<boolean>(false);
 	const [error, setError] = useState<string | null>(null);
 
+	// Get the correct callback URL for magic links
+	const getCallbackUrl = () => {
+		if (typeof window === "undefined") return "";
+
+		const baseUrl = window.location.origin;
+		return `${baseUrl}/api/auth/callback`;
+	};
+
 	const handleSignUp = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setLoading(true);
 		setError(null);
-		const { error } = await supabase.auth.signInWithOtp({
-			email,
-			options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` },
-		});
 
-		setLoading(false);
-		if (error) {
-			setError(error.message);
-		} else {
+		try {
+			const redirectTo = getCallbackUrl();
+			console.log("Redirect URL:", redirectTo);
+
+			const { data, error } = await supabase.auth.signInWithOtp({
+				email,
+				options: {
+					emailRedirectTo: redirectTo,
+				},
+			});
+
+			if (error) {
+				throw error;
+			}
+
+			// If successful, redirect to check email page
 			router.push("/auth/check-email");
+		} catch (err: any) {
+			console.error("Magic link error:", err);
+			setError(err.message || "Failed to send magic link");
+		} finally {
+			setLoading(false);
 		}
 	};
 
@@ -117,7 +138,7 @@ export default function SignUpPage() {
 					<p className='text-center text-gray-600'>
 						Already have an account?{" "}
 						<a
-							href='/auth/login'
+							href='/login'
 							className='text-blue-600 hover:underline'
 						>
 							Log In

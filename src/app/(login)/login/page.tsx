@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import GoogleLoginButton from "@/components/ui/GoogleButtonSignIn";
 import GithubLoginButton from "@/components/ui/GithubButtonSignIn";
+
 export default function LoginPage() {
 	const router = useRouter();
 
@@ -15,20 +16,41 @@ export default function LoginPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
+	// Get the correct callback URL for magic links
+	const getCallbackUrl = () => {
+		if (typeof window === "undefined") return "";
+
+		const baseUrl = window.location.origin;
+		return `${baseUrl}/api/auth/callback`;
+	};
+
 	const handleSignUp = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setLoading(true);
 		setError(null);
-		const { error } = await supabase.auth.signInWithOtp({
-			email,
-			options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` },
-		});
 
-		setLoading(false);
-		if (error) {
-			setError(error.message);
-		} else {
+		try {
+			const redirectTo = getCallbackUrl();
+			console.log("Redirect URL:", redirectTo);
+
+			const { data, error: signInError } = await supabase.auth.signInWithOtp({
+				email,
+				options: {
+					emailRedirectTo: redirectTo,
+				},
+			});
+
+			if (signInError) {
+				throw signInError;
+			}
+
+			// If successful, redirect to check email page
 			router.push("/auth/check-email");
+		} catch (err: any) {
+			console.error("Magic link error:", err);
+			setError(err?.message || "Failed to send magic link");
+		} finally {
+			setLoading(false);
 		}
 	};
 
@@ -104,7 +126,7 @@ export default function LoginPage() {
 							className='w-full py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 disabled:opacity-50'
 							disabled={loading}
 						>
-							{loading ? "Logging in…" : "Log in"}
+							{loading ? "Sending magic link..." : "Log in with Magic Link"}
 						</button>
 					</form>
 
@@ -124,7 +146,7 @@ export default function LoginPage() {
 					</div>
 
 					<p className='text-center text-gray-600'>
-						Don’t have an account?{" "}
+						Don't have an account?{" "}
 						<a
 							href='/signup'
 							className='text-blue-600 hover:underline'
