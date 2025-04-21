@@ -444,7 +444,8 @@ export async function closeRoom(
 		let room = roomData;
 		if (!room) {
 			// Only fetch the room if not provided
-			room = await getRoom(roomId);
+			const fetchedRoom = await getRoom(roomId);
+			room = fetchedRoom || undefined;
 		}
 		
 		if (!room) {
