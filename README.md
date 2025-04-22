@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+# Code Canvas
 
-First, run the development server:
+**Code Canvas** is a real-time collaborative coding and whiteboard platform built for technical interviews, pair programming, and team-based problem-solving. It allows you to sketch data structures, draw diagrams, and write code together—all within a seamless, low-latency environment.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🧭 Table of Contents
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- [Features](#-features)
+- [Authentication](#-authentication)
+- [Persistent Rooms](#persistent-rooms)
+- [Auto-Cleanup](#auto-cleanup)
+- [Contributing](#contributing)
+- [License](#license)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🚀 Features
 
-To learn more about Next.js, take a look at the following resources:
+- **Real-time Code Collaboration**  
+  Instant syncing of code edits across all participants.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Interactive Whiteboard**  
+  Draw diagrams, flowcharts, or sketch out logic alongside your code.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Low-Latency Communication**  
+  Engineered for smooth, lag-free interactions, ideal for interviews and collaboration.
 
-## Deploy on Vercel
+- **Multi-Language Support**  
+  Includes TypeScript, JavaScript, Python, Java, and more.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Authentication**  
+  Secure login using Email & OTP, Google OAuth, or GitHub OAuth.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Persistent Rooms**  
+  Users can create or join rooms with unique, shareable IDs for continued collaboration.
+
+- **Auto-Cleanup**  
+  Inactive rooms and whiteboards are automatically deleted after 24 hours to conserve resources.
+
+---
+
+## 🔐 Authentication
+
+- Email + One-Time Password (OTP)
+- Google OAuth
+- GitHub OAuth
+
+---
+
+## 🔁 Persistent Rooms
+
+- Unique room IDs for easy access
+- Ideal for recurring sessions and long-form collaboration
+
+---
+
+## 🧹 Auto-Cleanup
+
+- Inactive rooms/whiteboards auto-delete after 24 hours
+
+
+---
+
+## 📄 License
+
+> _Coming soon – Please specify the license type (MIT, GPL, etc.) if available._
