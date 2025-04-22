@@ -10,7 +10,7 @@ const unauthenticatedRoutes = [
 	"/about",
 ];
 // Auth-related routes that should bypass protection checks
-
+const bypassRoutes = ["/api/auth/callback", "/auth/check-email"];
 export const updateSession = async (request: NextRequest) => {
 	// This `try/catch` block is only here for the interactive tutorial.
 	// Feel free to remove once you have Supabase connected.
@@ -51,13 +51,12 @@ export const updateSession = async (request: NextRequest) => {
 		// https://supabase.com/docs/guides/auth/server-side/nextjs
 		const user = await supabase.auth.getUser();
 		// protected routes			
-		if (
-			protectedRoutes.some((route) =>
-				request.nextUrl.pathname.startsWith(route)
-			) &&
-			user.error
-		) {
-			return NextResponse.redirect(new URL("/dashboard", request.url));
+		if (bypassRoutes.some(route => request.nextUrl.pathname.startsWith(route))) {
+  	return response;
+		}		
+
+		if (protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route)) && user.error) {
+			return NextResponse.redirect(new URL("/login", request.url));
 		}
 
 		// only unauthenticated users should be able to view these routes

@@ -18,10 +18,14 @@ export default function LoginPage() {
 
 	// Get the correct callback URL for magic links
 	const getCallbackUrl = () => {
-		if (typeof window === "undefined") return "";
-
-		const baseUrl = window.location.origin;
-		return `${baseUrl}/api/auth/callback`;
+		// For production, use environment variable
+		if (process.env.NEXT_PUBLIC_SITE_URL) {
+			return `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`;
+		}
+		// For local development, use window.location.origin
+		return typeof window !== "undefined"
+			? `${window.location.origin}/api/auth/callback`
+			: "";
 	};
 
 	const handleSignUp = async (e: React.FormEvent) => {
