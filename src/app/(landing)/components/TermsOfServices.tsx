@@ -111,7 +111,7 @@ const TermsOfService: React.FC = () => {
 					<h2 className='text-2xl font-semibold mt-6 mb-2'>10. Contact</h2>
 					<p className='mb-4'>
 						For any questions or concerns, please contact us at
-						support@yourappdomain.com.
+						spamusubidump@gmail.com
 					</p>
 
 					<p className='mt-6'>Thank you for using our platform!</p>
