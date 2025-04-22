@@ -18,14 +18,32 @@ export default function LoginPage() {
 
 	// Get the correct callback URL for magic links
 	const getCallbackUrl = () => {
+		console.log("=== LOGIN PAGE: CALLBACK URL DEBUGGING ===");
+		console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+		console.log(
+			`NEXT_PUBLIC_SITE_URL: ${process.env.NEXT_PUBLIC_SITE_URL || "(not set)"}`
+		);
+		console.log(
+			`window.location.origin: ${typeof window !== "undefined" ? window.location.origin : "(SSR)"}`
+		);
+
 		// For production, use environment variable
-		if (process.env.NEXT_PUBLIC_SITE_URL) {
-			return `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`;
+		if (
+			process.env.NODE_ENV === "production" &&
+			process.env.NEXT_PUBLIC_SITE_URL
+		) {
+			const url = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`;
+			console.log(`Using production callback URL: ${url}`);
+			return url;
 		}
+
 		// For local development, use window.location.origin
-		return typeof window !== "undefined"
-			? `${window.location.origin}/api/auth/callback`
-			: "";
+		const url =
+			typeof window !== "undefined"
+				? `${window.location.origin}/api/auth/callback`
+				: "";
+		console.log(`Using local callback URL: ${url}`);
+		return url;
 	};
 
 	const handleSignUp = async (e: React.FormEvent) => {

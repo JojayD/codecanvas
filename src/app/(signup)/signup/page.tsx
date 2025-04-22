@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import GoogleLoginButton from "@/components/ui/GoogleButtonSignIn";
 import GithubLoginButton from "@/components/ui/GithubButtonSignIn";
+import { log } from "console";
 
 export default function SignUpPage() {
 	const router = useRouter();
@@ -17,11 +18,27 @@ export default function SignUpPage() {
 
 	// Get the correct callback URL for magic links
 	const getCallbackUrl = () => {
-		// For production, use environment variable
-		if (process.env.NEXT_PUBLIC_SITE_URL) {
-			return `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`;
+		console.log("=== SIGNUP PAGE: CALLBACK URL DEBUGGING ===");
+		console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+		console.log(
+			`NEXT_PUBLIC_SITE_URL: ${process.env.NEXT_PUBLIC_SITE_URL || "(not set)"}`
+		);
+		console.log(
+			`window.location.origin: ${typeof window !== "undefined" ? window.location.origin : "(SSR)"}`
+		);
+
+		// For production, use environment variable (use NODE_ENV instead of directly checking NEXT_PUBLIC_SITE_URL)
+		if (
+			process.env.NODE_ENV === "production" &&
+			process.env.NEXT_PUBLIC_SITE_URL
+		) {
+			const url = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`;
+			console.log(`Using production callback URL: ${url}`);
+			return url;
 		}
+
 		// For local development, use window.location.origin
+		console.log("Using local callback URL");
 		return typeof window !== "undefined"
 			? `${window.location.origin}/api/auth/callback`
 			: "";
