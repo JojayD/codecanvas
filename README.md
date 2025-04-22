@@ -65,4 +65,4 @@
 
 ## 📄 License
 
-> _Coming soon – Please specify the license type (MIT, GPL, etc.) if available._
+> Code Canvas 2025
