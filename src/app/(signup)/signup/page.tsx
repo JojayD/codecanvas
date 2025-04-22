@@ -151,9 +151,9 @@ export default function SignUpPage() {
 						<div className='w-full'>
 							<GoogleLoginButton />
 						</div>
-						<div className='w-full'>
+						{/* <div className='w-full'>
 							<GithubLoginButton />
-						</div>
+						</div> */}
 					</div>
 
 					<p className='text-center text-gray-600'>
