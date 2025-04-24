@@ -454,6 +454,14 @@ function Canvas() {
 						</button>
 					)}
 					<button
+						className='bg-purple-600 hover:bg-green-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
+						onClick={() => {
+							setShowVideoChat(!showVideoChat);
+						}}
+					>
+						{showVideoChat ? "Hide Video Chat" : "Show Video Chat"}
+					</button>
+					<button
 						className='bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
 						onClick={() => {
 							const url = `${window.location.origin}/canvas?roomId=${roomId}`;

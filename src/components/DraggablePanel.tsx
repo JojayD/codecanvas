@@ -12,6 +12,7 @@ import { Room, Track } from "livekit-client";
 import "@livekit/components-styles";
 import { Button } from "@/components/ui/button";
 import Draggable from "react-draggable";
+import throttle from "lodash/throttle";
 
 interface DraggableVideoChatProps {
 	username: string;
@@ -34,9 +35,44 @@ export default function DraggableVideoChat({
 				dynacast: true,
 			})
 	);
+	const [dimensions, setDimensions] = useState({ width: 320, height: 256 });
+	const [position, setPosition] = useState({ x: 20, y: 20 });
 
 	// Use a more specific type declaration for the ref with explicit cast
 	const nodeRef = useRef<HTMLDivElement>(null) as RefObject<HTMLElement>;
+	const throttledSetPosition = useRef(
+		throttle((pos) => setPosition(pos), 16)
+	).current;
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+
+		// Update dimensions based on minimized state
+		const width = minimized ? 240 : 320;
+		const height = minimized ? 144 : 256;
+		setDimensions({ width, height });
+
+		// Position in top-right corner with margin
+		const safeX = Math.max(
+			20,
+			Math.min(window.innerWidth - width - 20, position.x)
+		);
+		const safeY = Math.max(
+			80,
+			Math.min(window.innerHeight - height - 20, position.y)
+		);
+
+		setPosition({ x: safeX, y: safeY });
+
+		// Handle window resizing
+		const handleResize = () => {
+			const newX = Math.min(window.innerWidth - width - 20, position.x);
+			const newY = Math.min(window.innerHeight - height - 20, position.y);
+			setPosition({ x: newX, y: newY });
+		};
+
+		window.addEventListener("resize", handleResize);
+		return () => window.removeEventListener("resize", handleResize);
+	}, [minimized]);
 
 	useEffect(() => {
 		let mounted = true;
@@ -77,20 +113,40 @@ export default function DraggableVideoChat({
 	const toggleMinimize = () => {
 		setMinimized(!minimized);
 	};
+	const handleDrag = (e, data) => {
+		const { x, y } = data;
+
+		// Calculate viewport bounds
+		const headerHeight = 86; // Based on your layout
+		const maxX = window.innerWidth - dimensions.width;
+		const maxY = window.innerHeight - dimensions.height - headerHeight;
+
+		// Apply bounds
+		const boundedX = Math.min(maxX, Math.max(0, x));
+		const boundedY = Math.min(maxY, Math.max(0, y));
+
+		throttledSetPosition({ x: boundedX, y: boundedY });
+	};
 
 	return (
 		<Draggable
 			nodeRef={nodeRef}
 			handle='.drag-handle'
 			defaultPosition={{ x: 20, y: 20 }}
-			bounds='parent'
+			bounds='body'
+			onDrag={handleDrag}
 		>
 			<div
 				ref={nodeRef as React.RefObject<HTMLDivElement>}
 				className={`absolute z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ${
 					minimized ? "w-60 h-36" : "w-100 h-64"
 				}`}
-				style={{ boxShadow: "0 0 15px rgba(0,0,0,0.2)" }}
+				style={{
+					boxShadow: "0 0 15px rgba(0,0,0,0.2)",
+					transform: "translate3d(0,0,0)", // Force GPU acceleration
+					willChange: "transform", // Tell browser to optimize
+					touchAction: "none", // Improve touch handling
+				}}
 			>
 				<RoomContext.Provider value={roomInstance}>
 					<div className='drag-handle flex items-center justify-between bg-blue-600 px-2 py-1 cursor-move text-white text-xs'>

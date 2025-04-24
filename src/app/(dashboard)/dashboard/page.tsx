@@ -24,6 +24,7 @@ export default function Dashboard() {
 		setUserName(e.target.value);
 	};
 
+	
 	useEffect(() => {
 		console.log("enableAudio changed:", enableAudio);
 		console.log("enableCamera changed:", enableCamera);
