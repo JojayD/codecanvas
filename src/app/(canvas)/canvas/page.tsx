@@ -17,6 +17,9 @@ const DynamicCodeEditor = dynamic(
 		ssr: false,
 	}
 );
+const DynamicVideoChat = dynamic(() => import("@/components/DraggablePanel"), {
+	ssr: false,
+});
 
 // Import WhiteBoard with the correct Next.js dynamic import pattern
 // This fixes the 'canvas' module not found error (GitHub issue #102)
@@ -41,6 +44,12 @@ function Canvas() {
 	const [showUpdateNotification, setShowUpdateNotification] = useState(false);
 	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
 	const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
+	const [showVideoChat, setShowVideoChat] = useState(true);
+	const [videoSettings, setVideoSettings] = useState({
+		username: "",
+		audio: true,
+		video: true,
+	});
 	// Add a state to track if the component is safely mounted
 	const [isSafeToJoin, setIsSafeToJoin] = useState(false);
 	const {
@@ -75,6 +84,20 @@ function Canvas() {
 
 		return () => clearTimeout(safetyTimer);
 	}, []);
+
+	useEffect(() => {
+		// Get saved preferences from localStorage
+		const username =
+			localStorage.getItem("username") || currentUser?.username || "Anonymous";
+		const audioEnabled = localStorage.getItem("enableAudio") === "true";
+		const videoEnabled = localStorage.getItem("enableCamera") === "true";
+		console.log("Loaded video settings from localStorage");
+		setVideoSettings({
+			username,
+			audio: audioEnabled,
+			video: videoEnabled,
+		});
+	}, [currentUser]);
 
 	// Handle real-time updates
 	useEffect(() => {
@@ -500,6 +523,17 @@ function Canvas() {
 						</div>
 					</SplitPane>
 				</SplitPane>
+			</div>
+			<div>
+				{" "}
+				{showVideoChat && (
+					<DynamicVideoChat
+						username={videoSettings.username}
+						audio={videoSettings.audio}
+						video={videoSettings.video}
+						roomName={roomId} // Use the current room ID to keep video in the same context
+					/>
+				)}
 			</div>
 		</div>
 	);

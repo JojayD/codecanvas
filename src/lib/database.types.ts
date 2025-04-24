@@ -9,6 +9,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      livekit: {
+        Row: {
+          created_at: string
+          id: number
+          room_id: number
+          session_token: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          room_id: number
+          session_token?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          room_id?: number
+          session_token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "livekit_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["roomId"]
+          },
+        ]
+      }
       rooms: {
         Row: {
           code: string | null

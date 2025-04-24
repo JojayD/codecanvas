@@ -9,15 +9,50 @@ import { supabase } from "@/lib/supabase";
 import { getUserName } from "@/app/utils/supabase/lib/supabaseGetUserName";
 import { getUserId } from "@/app/utils/supabase/lib/supabaseGetUserId";
 import Image from "next/image";
+import { CiCamera } from "react-icons/ci";
+import { AiFillAudio } from "react-icons/ai";
+
 export default function Dashboard() {
 	const router = useRouter();
 	const [roomIdInput, setRoomIdInput] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [userName, setUserName] = useState("");
-
+	const [enableAudio, setEnableAudio] = useState(true);
+	const [enableCamera, setEnableCamera] = useState(true);
 	const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setUserName(e.target.value);
+	};
+
+	useEffect(() => {
+		console.log("enableAudio changed:", enableAudio);
+		console.log("enableCamera changed:", enableCamera);
+	}, [enableAudio, enableCamera]);
+
+	// Add this function after your other functions
+	const handlegoToTestVideoRoom = () => {
+		if (!userName.trim()) {
+			setError("Please enter a username");
+			return;
+		}
+
+		// Save username and media preferences to localStorage
+		localStorage.setItem("username", userName);
+		localStorage.setItem("enableAudio", enableAudio.toString());
+		localStorage.setItem("enableCamera", enableCamera.toString());
+
+		// Create a media state object
+		const mediaState = {
+			audio: enableAudio,
+			video: enableCamera,
+			username: userName,
+		};
+
+		// Encode the JSON as a URL parameter
+		const encodedState = encodeURIComponent(JSON.stringify(mediaState));
+
+		// Navigate to a test room with the state
+		router.push(`/cameraRoom?state=${encodedState}`);
 	};
 
 	const createNewRoom = async () => {
@@ -32,7 +67,8 @@ export default function Dashboard() {
 
 			// Save username to localStorage
 			localStorage.setItem("username", userName);
-
+			localStorage.setItem("enableAudio", enableAudio.toString());
+			localStorage.setItem("enableCamera", enableCamera.toString());
 			const userId = await getUserId();
 			// Generate a larger random ID for better security (6-8 digits)
 			const randomRoomId = Math.floor(100000 + Math.random() * 90000000);
@@ -314,6 +350,55 @@ export default function Dashboard() {
 										Join
 									</Button>
 								</div>
+							</div>
+							<div className='flex flex-col gap-3'>
+								<h1 className='text-gray-700 font-medium mb-2'>
+									Media options for your room
+								</h1>
+								<div className='flex space-x-4 mb-2 gap-4'>
+									<div className='flex items-center space-x-2'>
+										<input
+											type='checkbox'
+											id='enableAudio'
+											onChange={(e) => setEnableAudio(e.target.checked)}
+											className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+										/>
+										<Label
+											htmlFor='enableAudio'
+											className='flex items-center'
+										>
+											<AiFillAudio className='text-gray-600 text-xl mr-1' />
+											<span>Enable Audio</span>
+										</Label>
+									</div>
+									<div className='flex items-center space-x-2'>
+										<input
+											type='checkbox'
+											id='enableCamera'
+											onChange={(e) => setEnableCamera(e.target.checked)}
+											className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+										/>
+										<Label
+											htmlFor='enableCamera'
+											className='flex items-center'
+										>
+											<CiCamera className='text-gray-600 text-xl mr-1' />
+											<span>Enable Camera</span>
+										</Label>
+									</div>
+								</div>
+								<p className='text-xs text-gray-500 italic'>
+									You can change these settings after joining the room.
+								</p>
+								<button
+									className='border-4'
+									onClick={() => {
+										console.log("Hello");
+										handlegoToTestVideoRoom();
+									}}
+								>
+									camera room test
+								</button>
 							</div>
 						</div>
 					</div>
