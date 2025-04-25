@@ -50,7 +50,9 @@ function Canvas() {
 		audio: true,
 		video: true,
 	});
-	const[inCall, setInCall] = useState(true);
+	const [inCall, setInCall] = useState(true);
+	const [connectionError, setConnectionError] = useState(null);
+
 	// Add a state to track if the component is safely mounted
 	const [isSafeToJoin, setIsSafeToJoin] = useState(false);
 	const {
@@ -68,9 +70,13 @@ function Canvas() {
 		room,
 	} = useRoom();
 
+	useEffect(() => {
+		// Check if roomId is present
+		console.log("In call stat changed from Canvas component:", inCall);
+	}, [inCall]);
+
 	// Track if user has joined the room to avoid duplicate joins
 	const [hasJoinedLocally, setHasJoinedLocally] = useState(false);
-
 	// Track previous participants to detect changes
 	const prevParticipantsRef = React.useRef<string[]>([]);
 
@@ -327,6 +333,25 @@ function Canvas() {
 		}
 	};
 
+	const handleRejoinCall = async () => {
+		try {
+			// Only try to rejoin if they're not already in a call
+			if (!inCall) {
+				console.log("Attempting to rejoin video call...");
+				// We're just setting the state - the DraggablePanel will handle reconnection
+				// in its useEffect when inCall changes from false to true
+				setInCall(true);
+
+				// Show the video panel if it was hidden
+				if (!showVideoChat) {
+					setShowVideoChat(true);
+				}
+			}
+		} catch (error) {
+			console.error("Failed to rejoin call:", error);
+		}
+	};
+
 	const handleJoinRoom = async () => {
 		try {
 			// Don't try to join if already joined
@@ -472,6 +497,15 @@ function Canvas() {
 					>
 						Copy Invite Link
 					</button>
+					{/* Only show Join Call button if not already in a call */}
+					{!inCall && (
+						<button
+							className='bg-orange-600 hover:bg-green-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
+							onClick={handleRejoinCall}
+						>
+							Rejoin Call
+						</button>
+					)}
 				</div>
 			</div>
 
@@ -540,7 +574,9 @@ function Canvas() {
 						username={videoSettings.username}
 						audio={videoSettings.audio}
 						video={videoSettings.video}
-						roomName={roomId} // Use the current room ID to keep video in the same context
+						roomName={roomId} // Use the current room ID to keep video in the same context'
+						setInCall={setInCall}
+						inCall={inCall}
 					/>
 				)}
 			</div>

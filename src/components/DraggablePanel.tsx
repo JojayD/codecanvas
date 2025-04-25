@@ -9,6 +9,11 @@ import {
 	RoomContext,
 } from "@livekit/components-react";
 import { Room, Track, RoomConnectOptions } from "livekit-client";
+import {
+	ConnectionState as ConnectionStateUI,
+	useConnectionState,
+} from "@livekit/components-react";
+import { ConnectionState as ConnectionStateType } from "livekit-client";
 import "@livekit/components-styles";
 import { Button } from "@/components/ui/button";
 import Draggable, {
@@ -23,6 +28,7 @@ interface DraggableVideoChatProps {
 	video: boolean;
 	roomName?: string;
 	inCall?: boolean;
+	setInCall: (value: boolean) => void;
 }
 
 export default function DraggableVideoChat({
@@ -30,9 +36,13 @@ export default function DraggableVideoChat({
 	audio = false,
 	video = false,
 	roomName = "codecanvas-room",
+	inCall = true,
+	setInCall = () => {},
 }: DraggableVideoChatProps) {
 	const [minimized, setMinimized] = useState(false);
-	const [inCall, setInCall] = useState(true);
+	const [connectionState, setConnectionState] = useState<ConnectionStateType>(
+		ConnectionStateType.Disconnected
+	);
 	const [roomInstance] = useState(
 		() =>
 			new Room({
@@ -40,7 +50,7 @@ export default function DraggableVideoChat({
 				dynacast: true,
 			})
 	);
-	const [dimensions, setDimensions] = useState({ width: 600, height: 256 });
+	const [dimensions, setDimensions] = useState({ width: 500, height: 256 });
 	const [position, setPosition] = useState({
 		x: window.innerWidth - 340, // Position near the top-right by default
 		y: 80,
@@ -50,6 +60,38 @@ export default function DraggableVideoChat({
 	const nodeRef = useRef<HTMLDivElement>(null) as RefObject<HTMLElement>;
 
 	// Make position updates more immediate with a lower throttle time
+	useEffect(() => {
+		if (!roomInstance) return;
+
+		// Update state when connection changes
+		const handleConnectionStateChange = (state: ConnectionStateType) => {
+			console.log("Connection state changed to:", state);
+			setConnectionState(state);
+
+			// Automatically update inCall based on connection state
+			if (state === ConnectionStateType.Connected) {
+				setInCall(true);
+			} else if (state === ConnectionStateType.Disconnected) {
+				setInCall(false);
+			}
+		};
+		// Subscribe to connection changes
+		roomInstance.on("connectionStateChanged", handleConnectionStateChange);
+
+		// Set initial state
+		setConnectionState(roomInstance.state);
+		if (roomInstance.state === ConnectionStateType.Connected) {
+			setInCall(true);
+			console.log("Changed state to connected");
+		} else {
+			setInCall(false);
+			console.log("Changed state to disconnected");
+		}
+		return () => {
+			// Unsubscribe when component unmounts
+			roomInstance.off("connectionStateChanged", handleConnectionStateChange);
+		};
+	}, [roomInstance]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -84,6 +126,21 @@ export default function DraggableVideoChat({
 		window.addEventListener("resize", handleResize);
 		return () => window.removeEventListener("resize", handleResize);
 	}, [minimized]);
+
+	// Add this effect to watch for inCall changes from parent component
+	useEffect(() => {
+		// If inCall=true but we're not connected, reconnect to the room
+		if (inCall && connectionState !== ConnectionStateType.Connected) {
+			// Check connection state
+			console.log("Parent set inCall=true - reconnecting to LiveKit");
+			reJoinLiveKitCall();
+		}
+		// If inCall=false but we're connected, disconnect
+		else if (!inCall && connectionState === ConnectionStateType.Connected) {
+			console.log("Parent set inCall=false - leaving LiveKit call");
+			roomInstance.disconnect();
+		}
+	}, [inCall, connectionState, roomInstance, roomName, username]);
 
 	useEffect(() => {
 		let mounted = true;
@@ -120,7 +177,12 @@ export default function DraggableVideoChat({
 		setMinimized(!minimized);
 	};
 
-	const reJoinCall = async () => {
+	const leaveCall = () => {
+		roomInstance.disconnect();
+		setInCall(false);
+	};
+
+	const reJoinLiveKitCall = async () => {
 		try {
 			const resp = await fetch(`/api/token?room=${roomName}&username=${username}`);
 			const { token } = await resp.json();
@@ -130,11 +192,6 @@ export default function DraggableVideoChat({
 		} catch (e) {
 			console.error(e);
 		}
-	};
-
-	const leaveCall = () => {
-		roomInstance.disconnect();
-		setInCall(false);
 	};
 
 	const handleDrag: DraggableEventHandler = (e, data: DraggableData) => {
@@ -152,6 +209,7 @@ export default function DraggableVideoChat({
 		// Set position immediately without throttling for most responsive dragging
 		setPosition({ x: boundedX, y: boundedY });
 	};
+	const isConnected = connectionState === ConnectionStateType.Connected;
 
 	return (
 		<Draggable
@@ -184,7 +242,15 @@ export default function DraggableVideoChat({
 			>
 				<RoomContext.Provider value={roomInstance}>
 					<div className='drag-handle flex items-center justify-between bg-purple-600 px-2 py-1 cursor-move text-white text-xs'>
-						<span>Video Meeting</span>
+						<ConnectionStateUI />
+						{/* {isConnected && (
+							<button
+								onClick={leaveCall}
+								className='text-white hover:bg-red-700 rounded p-1 mr-2'
+							>
+								Leave Call
+							</button>
+						)} */}
 						<div className='flex space-x-1'>
 							<button
 								onClick={toggleMinimize}
@@ -194,25 +260,6 @@ export default function DraggableVideoChat({
 							</button>
 						</div>
 					</div>
-
-					{/* <div className='flex flex-col items-center justify-center h-full'>
-						{!inCall ? (
-							<Button
-								onClick={reJoinCall}
-								className='bg-purple-600 hover:bg-purple-700 text-white'
-							>
-								Rejoin Call
-							</Button>
-						) : (
-							<Button
-								onClick={leaveCall}
-								className='bg-red-600 hover:bg-red-700 text-white mt-2'
-							>
-								Leave Call
-							</Button>
-						)}
-					</div> */}
-
 					<div
 						className='relative'
 						style={{ height: minimized ? "calc(100% - 28px)" : "calc(100% - 28px)" }}
