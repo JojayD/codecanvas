@@ -50,6 +50,7 @@ function Canvas() {
 		audio: true,
 		video: true,
 	});
+	const[inCall, setInCall] = useState(true);
 	// Add a state to track if the component is safely mounted
 	const [isSafeToJoin, setIsSafeToJoin] = useState(false);
 	const {
