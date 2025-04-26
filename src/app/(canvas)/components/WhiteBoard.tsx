@@ -206,21 +206,6 @@ const WhiteBoard = () => {
 		}
 	}, [stageRef]);
 
-	// Add this useEffect near your other useEffect hooks
-	// Add this to your useEffect that loads the shapes
-	useEffect(() => {
-		if (layerRef.current && content.shapes.length > 0) {
-			// Ensure all shapes are available for interaction by moving
-			// them to appropriate z-index positions
-			content.shapes.forEach((shape, index) => {
-				const node = layerRef.current.findOne(`#${shape.id}`);
-				if (node) {
-					node.zIndex(100 + index); // Base z-index + sequential order
-				}
-			});
-			layerRef.current.batchDraw();
-		}
-	}, [content.shapes]);
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Delete" && selectedId) {
