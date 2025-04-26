@@ -52,8 +52,28 @@ const WhiteBoard = () => {
 	const isLocalChange = useRef(true);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [tool, setTool] = useState<
-		"select" | "rectangle" | "circle" | "line" | "text" | "eraser"
+		"select" | "square" | "circle" | "line" | "text" | "eraser" | "view"
 	>("select");
+	const [isDragging, setIsDragging] = useState(false);
+	const [draggedId, setDraggedId] = useState<string | null>(null);
+	const [stageWidth, setStageWidth] = useState(window.innerWidth);
+	const [stageHeight, setStageHeight] = useState(window.innerHeight * 0.8);
+	// Debug: log current tool and selected shape
+	useEffect(() => {
+		const handleResize = () => {
+			setStageWidth(window.innerWidth);
+			setStageHeight(window.innerHeight * 0.8);
+		};
+
+		// Add event listener
+		window.addEventListener("resize", handleResize);
+
+		// Clean up
+		return () => {
+			window.removeEventListener("resize", handleResize);
+		};
+	}, []);
+
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [newLine, setNewLine] = useState<number[]>([]);
 	const stageRef = useRef<any>(null);
@@ -105,27 +125,36 @@ const WhiteBoard = () => {
 					subscription = subscribeToWhiteboardChanges(
 						whiteboard.id,
 						(updatedWhiteboard) => {
-							isLocalChange.current = false;
+							if (!isLocalChange.current) {
+								// Parse the updated content
+								let updatedContent: WhiteboardContent;
+								if (typeof updatedWhiteboard.content === "string") {
+									updatedContent = parseWhiteboardContent(updatedWhiteboard.content);
+								} else if (
+									typeof updatedWhiteboard.content === "object" &&
+									updatedWhiteboard.content !== null
+								) {
+									const objContent = updatedWhiteboard.content as any;
+									updatedContent = objContent.shapes
+										? (objContent as WhiteboardContent)
+										: createEmptyContent();
+								} else {
+									updatedContent = createEmptyContent();
+								}
 
-							// Handle content - could be string or object
-							let updatedContent: WhiteboardContent;
-							if (typeof updatedWhiteboard.content === "string") {
-								updatedContent = parseWhiteboardContent(updatedWhiteboard.content);
-							} else if (
-								typeof updatedWhiteboard.content === "object" &&
-								updatedWhiteboard.content !== null
-							) {
-								const objContent = updatedWhiteboard.content as any;
-								updatedContent = objContent.shapes
-									? (objContent as WhiteboardContent)
-									: createEmptyContent();
-							} else {
-								updatedContent = createEmptyContent();
+								// Only update if the remote version is newer than our local version
+								if (updatedContent.version > content.version) {
+									console.log(
+										"Received newer version from server:",
+										updatedContent.version
+									);
+									setContent(updatedContent);
+									setSelectedId(null);
+								}
 							}
 
-							setContent(updatedContent);
-							// Reset selected shape when whiteboard is updated
-							setSelectedId(null);
+							// Reset the flag for future updates
+							isLocalChange.current = true;
 						}
 					);
 				} else {
@@ -153,32 +182,80 @@ const WhiteBoard = () => {
 	// Update transformer on selection change
 	useEffect(() => {
 		if (selectedId && transformerRef.current) {
-			// Find the corresponding node by id
 			const node = layerRef.current?.findOne(`#${selectedId}`);
 			if (node) {
 				// Attach transformer to selected node
 				transformerRef.current.nodes([node]);
 				transformerRef.current.getLayer().batchDraw();
+
+				// Bring selected shape to top for better visibility and interaction
+				node.moveToTop();
+				transformerRef.current.moveToTop();
 			}
 		} else if (transformerRef.current) {
-			// Detach transformer
 			transformerRef.current.nodes([]);
 			transformerRef.current.getLayer().batchDraw();
 		}
-	}, [selectedId, content.shapes]);
+	}, [selectedId]);
 
+	// Add dragDistance setting to Stage ref after it's created
+	useEffect(() => {
+		if (stageRef.current) {
+			// Make dragging more responsive by reducing drag threshold
+			stageRef.current.dragDistance(0);
+		}
+	}, [stageRef]);
+
+	// Add this useEffect near your other useEffect hooks
+	// Add this to your useEffect that loads the shapes
+	useEffect(() => {
+		if (layerRef.current && content.shapes.length > 0) {
+			// Ensure all shapes are available for interaction by moving
+			// them to appropriate z-index positions
+			content.shapes.forEach((shape, index) => {
+				const node = layerRef.current.findOne(`#${shape.id}`);
+				if (node) {
+					node.zIndex(100 + index); // Base z-index + sequential order
+				}
+			});
+			layerRef.current.batchDraw();
+		}
+	}, [content.shapes]);
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Delete" && selectedId) {
+				handleDeleteShape(selectedId);
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => {
+			window.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [selectedId]);
 	// Save whiteboard content with debounce
 	const saveContent = useRef(
-		debounce(async (newContent: WhiteboardContent) => {
+		debounce(async (newContent: any) => {
 			if (!whiteboardId || !isLocalChange.current) {
 				isLocalChange.current = true;
 				return;
 			}
 
 			try {
-				// Refresh auth before saving
+				// Set a flag to ignore the next update from the server
+				// since we already have the changes locally
+				const localVersion = newContent.version;
+
 				await refreshAuth();
-				await updateWhiteboard(whiteboardId, newContent);
+				const result = await updateWhiteboard(whiteboardId, newContent);
+
+				// If we got a result and the versions match, don't update local state again
+				if (
+					result &&
+					parseWhiteboardContent(result.content).version === localVersion
+				) {
+					console.log("Local and server versions match, skipping update");
+				}
 			} catch (error) {
 				console.error("Error saving whiteboard content:", error);
 			}
@@ -265,28 +342,17 @@ const WhiteBoard = () => {
 	};
 
 	// Handle keyboard events
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Delete" && selectedId) {
-				handleDeleteShape(selectedId);
-			}
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => {
-			window.removeEventListener("keydown", handleKeyDown);
-		};
-	}, [selectedId]);
 
 	// Handle mouse events for drawing
 	const handleMouseDown = (e: any) => {
-		// Deselect when clicked on empty area
+		// Only deselect when clicking on empty stage area and in select mode
 		const clickedOnEmpty = e.target === e.target.getStage();
-		if (clickedOnEmpty) {
+
+		if (clickedOnEmpty && tool === "select") {
 			setSelectedId(null);
 		}
 
-		// Start drawing for line tool
+		// For drawing tools
 		if (tool === "line") {
 			setIsDrawing(true);
 			const pos = e.target.getStage().getPointerPosition();
@@ -302,6 +368,7 @@ const WhiteBoard = () => {
 		} else {
 			setCursorPosition(null);
 		}
+		if (tool === "view") return; // Skip all interactions in view mode
 
 		// No drawing - skipping
 		if (!isDrawing) {
@@ -317,6 +384,8 @@ const WhiteBoard = () => {
 
 	const handleMouseUp = () => {
 		// End drawing
+		if (tool === "view") return; // Skip all interactions in view mode
+
 		if (isDrawing && tool === "line" && newLine.length > 2) {
 			const newLineShape: Omit<KonvaShape, "id"> = {
 				type: "line",
@@ -338,7 +407,12 @@ const WhiteBoard = () => {
 	// Handle stage click for adding shapes
 	const handleStageClick = (e: any) => {
 		// Only handle click if tool is not select
-		if (tool === "select" || isDrawing) return;
+
+		if (e.target !== e.target.getStage()) {
+			return;
+		}
+
+		if (tool === "view" || tool === "select" || isDrawing) return;
 
 		const stage = e.target.getStage();
 		const pos = stage.getPointerPosition();
@@ -350,15 +424,15 @@ const WhiteBoard = () => {
 		}
 
 		// Add shape based on selected tool
-		if (tool === "rectangle") {
+		if (tool === "square") {
 			const newRect: Omit<KonvaShape, "id"> = {
-				type: "rect",
+				type: "rect", // Changed to "rect" to match Konva's standard shape type
 				x: pos.x - 25,
 				y: pos.y - 25,
 				width: 50,
 				height: 50,
 				fill: "#89CFF0",
-				stroke: "#000",
+				stroke: "#FF0000",
 				strokeWidth: 1,
 				draggable: true,
 			};
@@ -426,7 +500,7 @@ const WhiteBoard = () => {
 					}
 				}
 			} else if (shape.type === "rect" && shape.width && shape.height) {
-				// For rectangles
+				// For rectangles (squares in UI)
 				const { x, y, width, height } = shape;
 				if (
 					pos.x >= x! - eraserSize &&
@@ -495,38 +569,132 @@ const WhiteBoard = () => {
 
 	// Render shape based on its type
 	const renderShape = (shape: KonvaShape) => {
-		const isSelected = shape.id === selectedId;
+		// Use the draggable property from the shape itself, no need to calculate
 
+		const isSelected = shape.id === selectedId;
+		const isBeingDragged = shape.id === draggedId && isDragging;
+		const sharedProps = {
+			id: shape.id,
+			x: shape.x || 0, // Provide fallbacks for all properties
+			y: shape.y || 0,
+			onClick: (e: any) => {
+				e.cancelBubble = true; // Stop event propagation
+				if (tool === "select") {
+					setSelectedId(shape.id);
+				}
+			},
+			onTap: (e: any) => {
+				e.cancelBubble = true; // Stop event propagation
+				if (tool === "select") {
+					setSelectedId(shape.id);
+				}
+			},
+			onDragStart: (e: any) => {
+				e.target.setAttrs({
+					shadowOffset: { x: 5, y: 5 },
+					shadowBlur: 10,
+					shadowColor: "rgba(0,0,0,0.3)",
+					shadowOpacity: 0.5,
+				});
+			},
+			onDragEnd: (e: any) => {
+				e.target.setAttrs({
+					shadowOffset: { x: 0, y: 0 },
+					shadowBlur: 0,
+					shadowOpacity: 0,
+				});
+
+				handleUpdateShape(shape.id, {
+					x: e.target.x(),
+					y: e.target.y(),
+				});
+			},
+		};
 		if (shape.type === "rect") {
 			return (
 				<Rect
+					{...sharedProps}
 					key={shape.id}
-					id={shape.id}
-					x={shape.x}
-					y={shape.y}
-					width={shape.width}
-					height={shape.height}
-					fill={shape.fill}
-					stroke={shape.stroke}
-					strokeWidth={shape.strokeWidth}
-					draggable={shape.draggable}
-					onClick={() => setSelectedId(shape.id)}
-					onTap={() => setSelectedId(shape.id)}
+					draggable={tool === "select"}
+					width={shape.width || 50}
+					height={shape.height || 50}
+					fill={shape.fill || "#89CFF0"}
+					stroke={shape.stroke || "#000"}
+					strokeWidth={shape.strokeWidth || 1}
+					onClick={(e) => {
+						console.log("🛠️ [Rect] onClick:", shape.id, "tool:", tool);
+						if (tool === "select") {
+							setSelectedId(shape.id);
+						}
+					}}
+					onMouseEnter={() => {
+						console.log("🛠️ [Rect] onMouseEnter:", shape.id);
+					}}
+					onDragStart={(e) => {
+						console.log(
+							"🛠️ [Rect] onDragStart:",
+							shape.id,
+							"tool:",
+							tool,
+							"draggable:",
+							tool === "select"
+						);
+						setIsDragging(true);
+						setDraggedId(shape.id);
+
+						// Hide transformer during drag to prevent interference
+						if (transformerRef.current) {
+							transformerRef.current.nodes([]);
+							transformerRef.current.getLayer()?.batchDraw();
+						}
+
+						e.target.setAttrs({
+							shadowOffset: { x: 5, y: 5 },
+							shadowBlur: 10,
+							shadowColor: "rgba(0,0,0,0.3)",
+							shadowOpacity: 0.5,
+						});
+					}}
 					onDragEnd={(e) => {
+						console.log(
+							"🛠️ [Rect] onDragEnd:",
+							shape.id,
+							"tool:",
+							tool,
+							"draggable:",
+							tool === "select"
+						);
+						setIsDragging(false);
+						setDraggedId(null);
+
+						e.target.setAttrs({
+							shadowOffset: { x: 0, y: 0 },
+							shadowBlur: 0,
+							shadowOpacity: 0,
+						});
+
+						// Update position
 						handleUpdateShape(shape.id, {
 							x: e.target.x(),
 							y: e.target.y(),
 						});
+
+						// Restore transformer after drag
+						if (transformerRef.current && selectedId) {
+							const node = layerRef.current?.findOne(`#${selectedId}`);
+							if (node) {
+								transformerRef.current.nodes([node]);
+								transformerRef.current.getLayer()?.batchDraw();
+							}
+						}
 					}}
 					onTransformEnd={(e) => {
-						// Transformer changes scale, but we want to change width and height
 						const node = e.target;
 						handleUpdateShape(shape.id, {
 							x: node.x(),
 							y: node.y(),
-							width: node.width() * node.scaleX(),
-							height: node.height() * node.scaleY(),
-							// Reset scale
+							width: Math.max(5, node.width() * node.scaleX()),
+							height: Math.max(5, node.height() * node.scaleY()),
 							scaleX: 1,
 							scaleY: 1,
 						});
@@ -534,24 +702,75 @@ const WhiteBoard = () => {
 				/>
 			);
 		} else if (shape.type === "circle") {
+			// Debug: log render conditions for Circle
+			console.log(
+				`🛠️ [Circle render] id=${shape.id}, tool=${tool}, draggable=${tool === "select"}`
+			);
 			return (
 				<Circle
+					{...sharedProps}
 					key={shape.id}
-					id={shape.id}
-					x={shape.x}
-					y={shape.y}
+					draggable={tool === "select"}
 					radius={shape.radius}
-					fill={shape.fill}
-					stroke={shape.stroke}
-					strokeWidth={shape.strokeWidth}
-					draggable={shape.draggable}
-					onClick={() => setSelectedId(shape.id)}
-					onTap={() => setSelectedId(shape.id)}
+					fill={isBeingDragged ? "#B3E5FC" : shape.fill} // Highlight while dragging
+					stroke={isSelected ? "#2196F3" : shape.stroke} // Highlight when selected
+					strokeWidth={isSelected ? 2 : shape.strokeWidth}
+					onClick={(e) => {
+						console.log("🛠️ [Circle] onClick:", shape.id, "tool:", tool);
+						if (tool === "select") {
+							setSelectedId(shape.id);
+						}
+					}}
+					onMouseEnter={() => {
+						console.log("🛠️ [Circle] onMouseEnter:", shape.id);
+					}}
+					onTap={() => {
+						if (tool === "select") setSelectedId(shape.id);
+					}}
+					onDragStart={(e) => {
+						console.log(
+							"🛠️ [Circle] onDragStart:",
+							shape.id,
+							"tool:",
+							tool,
+							"draggable:",
+							tool === "select"
+						);
+						setIsDragging(true);
+						setDraggedId(shape.id);
+
+						// Hide transformer during drag to prevent interference
+						if (transformerRef.current) {
+							transformerRef.current.nodes([]);
+							transformerRef.current.getLayer()?.batchDraw();
+						}
+					}}
 					onDragEnd={(e) => {
+						console.log(
+							"🛠️ [Circle] onDragEnd:",
+							shape.id,
+							"tool:",
+							tool,
+							"draggable:",
+							tool === "select"
+						);
+						setIsDragging(false);
+						setDraggedId(null);
+
+						// Update position
 						handleUpdateShape(shape.id, {
 							x: e.target.x(),
 							y: e.target.y(),
 						});
+
+						// Restore transformer after drag
+						if (transformerRef.current && selectedId) {
+							const node = layerRef.current?.findOne(`#${selectedId}`);
+							if (node) {
+								transformerRef.current.nodes([node]);
+								transformerRef.current.getLayer()?.batchDraw();
+							}
+						}
 					}}
 					onTransformEnd={(e) => {
 						const node = e.target;
@@ -569,19 +788,81 @@ const WhiteBoard = () => {
 		} else if (shape.type === "line") {
 			return (
 				<Line
+					{...sharedProps}
 					key={shape.id}
-					id={shape.id}
+					draggable={tool === "select"}
 					points={shape.points}
 					stroke={shape.stroke}
 					strokeWidth={shape.strokeWidth}
-					draggable={shape.draggable}
-					onClick={() => setSelectedId(shape.id)}
-					onTap={() => setSelectedId(shape.id)}
+					onClick={(e) => {
+						console.log("🛠️ [Line] onClick:", shape.id, "tool:", tool);
+						if (tool === "select") {
+							setSelectedId(shape.id);
+						}
+					}}
+					onMouseEnter={() => {
+						console.log("🛠️ [Line] onMouseEnter:", shape.id);
+					}}
+					onTap={() => {
+						if (tool === "select") setSelectedId(shape.id);
+					}}
+					onDragStart={(e) => {
+						console.log(
+							"🛠️ [Line] onDragStart:",
+							shape.id,
+							"tool:",
+							tool,
+							"draggable:",
+							tool === "select"
+						);
+						setIsDragging(true);
+						setDraggedId(shape.id);
+
+						// Hide transformer during drag
+						if (transformerRef.current) {
+							transformerRef.current.nodes([]);
+							transformerRef.current.getLayer()?.batchDraw();
+						}
+
+						e.target.setAttrs({
+							shadowOffset: { x: 5, y: 5 },
+							shadowBlur: 10,
+							shadowColor: "rgba(0,0,0,0.3)",
+							shadowOpacity: 0.5,
+						});
+					}}
 					onDragEnd={(e) => {
+						console.log(
+							"🛠️ [Line] onDragEnd:",
+							shape.id,
+							"tool:",
+							tool,
+							"draggable:",
+							tool === "select"
+						);
+						setIsDragging(false);
+						setDraggedId(null);
+
+						e.target.setAttrs({
+							shadowOffset: { x: 0, y: 0 },
+							shadowBlur: 0,
+							shadowOpacity: 0,
+						});
+
+						// Update position
 						handleUpdateShape(shape.id, {
 							x: e.target.x(),
 							y: e.target.y(),
 						});
+
+						// Restore transformer after drag
+						if (transformerRef.current && selectedId) {
+							const node = layerRef.current?.findOne(`#${selectedId}`);
+							if (node) {
+								transformerRef.current.nodes([node]);
+								transformerRef.current.getLayer()?.batchDraw();
+							}
+						}
 					}}
 				/>
 			);
@@ -603,24 +884,24 @@ const WhiteBoard = () => {
 		<div className='h-full w-full bg-white border-slate-200 border flex flex-col'>
 			<div className='p-2 bg-gray-100 flex justify-between'>
 				<div className='flex space-x-2'>
-					<button
+					{/* <button
 						className={`px-2 py-1 text-xs rounded ${tool === "select" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
 						onClick={() => setTool("select")}
 					>
 						Select
-					</button>
-					<button
-						className={`px-2 py-1 text-xs rounded ${tool === "rectangle" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
-						onClick={() => setTool("rectangle")}
+					</button> */}
+					{/* <button
+						className={`px-2 py-1 text-xs rounded ${tool === "square" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
+						onClick={() => setTool("square")}
 					>
-						Rectangle
-					</button>
-					<button
+						Square
+					</button> */}
+					{/* <button
 						className={`px-2 py-1 text-xs rounded ${tool === "circle" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
 						onClick={() => setTool("circle")}
 					>
 						Circle
-					</button>
+					</button> */}
 					<button
 						className={`px-2 py-1 text-xs rounded ${tool === "line" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
 						onClick={() => setTool("line")}
@@ -633,6 +914,12 @@ const WhiteBoard = () => {
 						onClick={() => setTool("eraser")}
 					>
 						Eraser
+					</button>
+					<button
+						className={`px-2 py-1 text-xs rounded ${tool === "view" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
+						onClick={() => setTool("view")}
+					>
+						View Only
 					</button>
 				</div>
 				<div className='flex items-center space-x-2'>
@@ -663,8 +950,8 @@ const WhiteBoard = () => {
 
 			<div className='flex-grow bg-white'>
 				<Stage
-					width={window.innerWidth}
-					height={window.innerHeight * 0.8}
+					width={stageWidth}
+					height={stageHeight}
 					onMouseDown={handleMouseDown}
 					onMouseMove={handleMouseMove}
 					onMouseUp={handleMouseUp}

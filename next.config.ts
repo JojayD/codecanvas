@@ -29,7 +29,7 @@ const nextConfig = {
 				canvas: false,
 			};
 		} else {
-			config.externals = [...(config.externals || []), "canvas"];
+			config.externals = [...(config.externals || []), {canvas: "canvas"}];
 		}
 
 		return config;
