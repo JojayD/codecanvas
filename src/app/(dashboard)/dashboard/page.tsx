@@ -73,9 +73,6 @@ export default function Dashboard() {
 		}
 	};
 
-	const joinTestWhiteBoard = () =>{
-		router.push("/whiteBoardTest")
-	}
 	const joinExistingRoom = () => {
 		if (!roomIdInput.trim()) {
 			setError("Please enter a room ID");
@@ -315,12 +312,6 @@ export default function Dashboard() {
 										className='px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium'
 									>
 										Join
-									</Button>
-									<Button
-										onClick={joinTestWhiteBoard}
-										className='px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium'
-									>
-										Join Testing WhiteboardRoom
 									</Button>
 								</div>
 							</div>
