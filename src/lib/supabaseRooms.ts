@@ -3,14 +3,19 @@ import {
 	Room,
 	CreateRoomPayload,
 	UpdateRoomPayload,
+	CreateLivekitRoomPayload,
+	LivekitRoom,
 } from "./supabase";
 import { createWhiteboard } from "./supabaseWhiteboard";
 import { closeRoomSimple } from "./closeRoom";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import {supabase } from "./supabase";
+import { createLivekitRoom } from "./supabaseLiveKit";
 /**
  * Create a new room
  */
+
+
 export async function createRoom(
 	roomData: CreateRoomPayload
 ): Promise<Room | null> {
@@ -43,6 +48,22 @@ export async function createRoom(
 			} catch (whiteboardError) {
 				console.error("Error creating whiteboard:", whiteboardError);
 				// We don't throw here as the room was still created successfully
+			}
+
+			// Create a livekit room for this room
+			if (data) {
+				try {
+					console.log(`Creating livekit room for room ${data.roomId}`);
+					const livekitRoom = await createLivekitRoom(data.roomId);
+					if (!livekitRoom) {
+						console.warn(`Failed to create livekit room for room ${data.roomId}`);
+					} else {
+						console.log(`Livekit room created successfully for room ${data.roomId}`);
+					}
+				}catch (livekitError) {
+					console.error("Error creating livekit room:", livekitError);
+					// We don't throw here as the room was still created successfully
+				}
 			}
 		}
 
@@ -555,6 +576,8 @@ export async function handleHostExit(
 
 /**
  * Subscribe to room changes
+ * This function sets up a real-time subscription to room changes using Supabase's
+ *	
  */
 export function subscribeToRoom(
 	roomId: string | number,

@@ -942,7 +942,14 @@ const WhiteBoard = () => {
 					onMouseUp={handleMouseUp}
 					onClick={handleStageClick}
 					ref={stageRef}
-					style={{ cursor: tool === "eraser" ? "none" : "default" }}
+					style={{
+						cursor: tool === "eraser" ? "none" : "default",
+						touchAction: "none",
+					}}
+					draggable={tool === "select"}
+					dragBoundFunc={(pos) => pos}
+					perfectDrawEnabled={false}
+					listening={true}
 				>
 					<Layer ref={layerRef}>
 						{content.shapes.map((shape) => renderShape(shape))}

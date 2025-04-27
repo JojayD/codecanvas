@@ -9,6 +9,8 @@ import Prompt from "../components/Prompt";
 import { supabase } from "@/lib/supabase";
 import React from "react";
 import { withAuthProtection } from "@/app/context/AuthProvider";
+import { Visibility } from "aws-cdk-lib/aws-appsync";
+import { set } from "lodash";
 
 // Dynamically import the CodeEditor component to avoid SSR issues
 const DynamicCodeEditor = dynamic(
@@ -17,6 +19,9 @@ const DynamicCodeEditor = dynamic(
 		ssr: false,
 	}
 );
+const DynamicVideoChat = dynamic(() => import("@/components/DraggablePanel"), {
+	ssr: false,
+});
 
 // Import WhiteBoard with the correct Next.js dynamic import pattern
 // This fixes the 'canvas' module not found error (GitHub issue #102)
@@ -41,6 +46,15 @@ function Canvas() {
 	const [showUpdateNotification, setShowUpdateNotification] = useState(false);
 	const [lastUpdate, setLastUpdate] = useState<string | null>(null);
 	const [typingTimer, setTypingTimer] = useState<NodeJS.Timeout | null>(null);
+	const [showVideoChat, setShowVideoChat] = useState(true);
+	const [videoSettings, setVideoSettings] = useState({
+		username: "",
+		audio: true,
+		video: true,
+	});
+	const [inCall, setInCall] = useState(true);
+	const [connectionError, setConnectionError] = useState<boolean>(false);
+	const [visibility, setVisibility] = useState<boolean>(true);
 	// Add a state to track if the component is safely mounted
 	const [isSafeToJoin, setIsSafeToJoin] = useState(false);
 	const {
@@ -57,12 +71,31 @@ function Canvas() {
 		updateLanguage,
 		room,
 	} = useRoom();
-
 	// Track if user has joined the room to avoid duplicate joins
 	const [hasJoinedLocally, setHasJoinedLocally] = useState(false);
-
 	// Track previous participants to detect changes
 	const prevParticipantsRef = React.useRef<string[]>([]);
+
+	useEffect(() => {
+		// Check if roomId is present
+		console.log("In call stat changed from Canvas component:", inCall);
+		console.log("Show video chat stat changed from Canvas component:", showVideoChat);
+	}, [inCall, showVideoChat]);
+
+	useEffect(() => {
+		if (inCall) {
+			console.log("In call stat changed from Canvas component:", inCall);
+
+			const checkPermissions = async () => {
+				const permissionStatus = await detectMediaPermissions();
+
+				if (!permissionStatus.granted) {
+					setConnectionError(true);
+				}
+			};
+			checkPermissions();
+		}
+	}, [inCall]);
 
 	// Add a delayed "safe to join" effect to ensure component is stably mounted before joining
 	useEffect(() => {
@@ -75,6 +108,20 @@ function Canvas() {
 
 		return () => clearTimeout(safetyTimer);
 	}, []);
+
+	useEffect(() => {
+		// Get saved preferences from localStorage
+		const username =
+			localStorage.getItem("username") || currentUser?.username || "Anonymous";
+		const audioEnabled = localStorage.getItem("enableAudio") === "true";
+		const videoEnabled = localStorage.getItem("enableCamera") === "true";
+		console.log("Loaded video settings from localStorage");
+		setVideoSettings({
+			username,
+			audio: audioEnabled,
+			video: videoEnabled,
+		});
+	}, [currentUser]);
 
 	// Handle real-time updates
 	useEffect(() => {
@@ -137,6 +184,10 @@ function Canvas() {
 			setLastUpdate(`Session started at ${new Date().toLocaleTimeString()}`);
 		}
 	}, [code]);
+
+	/**
+	 * useEffect for initialize video call
+	 */
 
 	// Force join the room when component mounts
 	useEffect(() => {
@@ -253,6 +304,28 @@ function Canvas() {
 		}
 	}, [room, loading]);
 
+	const detectMediaPermissions = async () => {
+		try {
+			// Try to access media devices
+			const stream = await navigator.mediaDevices.getUserMedia({
+				audio: videoSettings.audio,
+				video: videoSettings.video,
+			});
+
+			// If successful, clean up the test stream
+			stream.getTracks().forEach((track) => track.stop());
+			return { granted: true };
+		} catch (error: unknown) {
+			console.error("Media permission error:", error);
+
+			if (error instanceof Error) {
+				return { granted: false, message: error.message };
+			}
+			// Add default return for non-Error types
+			return { granted: false, message: "Unknown media permission error" };
+		}
+	};
+
 	const handleLogout = async () => {
 		try {
 			// Call a dedicated signout API endpoint to clear cookies properly
@@ -300,6 +373,25 @@ function Canvas() {
 			router.push("/dashboard");
 		} catch (error) {
 			console.error("Error leaving room:", error);
+		}
+	};
+
+	const handleRejoinCall = async () => {
+		try {
+			// Only try to rejoin if they're not already in a call
+			if (!inCall) {
+				console.log("Attempting to rejoin video call...");
+				// We're just setting the state - the DraggablePanel will handle reconnection
+				// in its useEffect when inCall changes from false to true
+				setInCall(true);
+
+				// Show the video panel if it was hidden
+				if (!showVideoChat) {
+					setShowVideoChat(true);
+				}
+			}
+		} catch (error) {
+			console.error("Failed to rejoin call:", error);
 		}
 	};
 
@@ -386,7 +478,6 @@ function Canvas() {
 					</nav>
 				</div>
 			</header>
-
 			<div className='bg-gray-800 text-white p-2 flex justify-between items-center'>
 				<div className='flex items-center'>
 					<span className='mr-2 font-semibold'>
@@ -431,6 +522,14 @@ function Canvas() {
 						</button>
 					)}
 					<button
+						className='bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
+						onClick={() => {
+							setShowVideoChat(!showVideoChat);
+						}}
+					>
+						{showVideoChat ? "Hide Video Chat" : "Show Video Chat"}
+					</button>
+					<button
 						className='bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
 						onClick={() => {
 							const url = `${window.location.origin}/canvas?roomId=${roomId}`;
@@ -440,9 +539,17 @@ function Canvas() {
 					>
 						Copy Invite Link
 					</button>
+					{/* Only show Join Call button if not already in a call */}
+					{!inCall && (
+						<button
+							className='bg-orange-600 hover:bg-green-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
+							onClick={handleRejoinCall}
+						>
+							Rejoin Call
+						</button>
+					)}
 				</div>
 			</div>
-
 			{/* Real-time update notification */}
 			{showUpdateNotification && (
 				<div className='bg-blue-500 text-white px-4 py-2 text-sm transition-opacity duration-300 flex justify-between items-center'>
@@ -455,12 +562,10 @@ function Canvas() {
 					</button>
 				</div>
 			)}
-
 			{/* Last update timestamp (always visible) */}
 			<div className='bg-gray-700 text-gray-300 px-4 py-1 text-xs'>
 				{lastUpdate || ""}
 			</div>
-
 			<div
 				style={{
 					flexGrow: 1,
@@ -500,6 +605,78 @@ function Canvas() {
 						</div>
 					</SplitPane>
 				</SplitPane>
+			</div>
+			<div>
+				{" "}
+				<DynamicVideoChat
+					username={videoSettings.username}
+					audio={videoSettings.audio}
+					video={videoSettings.video}
+					roomName={roomId} // Use the current room ID to keep video in the same context'
+					setInCall={setInCall}
+					inCall={inCall}
+					showVideoChat={showVideoChat}
+					className={showVideoChat ? "visible" : "hidden"}
+				/>
+			</div>
+			<div>
+				{connectionError && (
+					<div>
+						<div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm'>
+							<div className='bg-white rounded-lg shadow-xl p-6 max-w-md w-full'>
+								<div className='text-red-500 mb-2 text-xl font-bold flex items-center'>
+									<svg
+										xmlns='http://www.w3.org/2000/svg'
+										className='h-6 w-6 mr-2'
+										fill='none'
+										viewBox='0 0 24 24'
+										stroke='currentColor'
+									>
+										<path
+											strokeLinecap='round'
+											strokeLinejoin='round'
+											strokeWidth={2}
+											d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+										/>
+									</svg>
+									Camera/Microphone Access Blocked
+								</div>
+
+								<p className='text-gray-700 mb-4'>
+									CodeCanvas needs access to your camera and microphone for video chat.
+									Please allow access in your browser settings. If you don't want to use
+									the camera you can click on the dismiss button
+								</p>
+
+								<div className='bg-gray-100 p-3 rounded-md mb-4'>
+									<h3 className='font-semibold mb-2'>How to fix this:</h3>
+									<ol className='list-decimal pl-5 text-sm'>
+										<li>Click the camera/lock icon in your browser's address bar</li>
+										<li>Select "Always allow" for camera and microphone on this site</li>
+										<li>Refresh the page</li>
+									</ol>
+								</div>
+
+								<div className='flex justify-end space-x-3'>
+									<button
+										onClick={() => setConnectionError(false)}
+										className='px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md border'
+									>
+										Dismiss
+									</button>
+									<button
+										onClick={() => {
+											window.location.reload();
+										}}
+										className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700'
+									>
+										Refresh Page
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
 			</div>
 		</div>
 	);

@@ -290,7 +290,7 @@ const CodeEditor = ({
 					{saveStatus === "error" && (
 						<span className='text-sm text-red-600'>Save failed</span>
 					)}
-					<div className='text-sm text-gray-500'>Document ID: {docId}</div>
+					<div className='text-sm text-gray-500 line-clamp-1'>Document ID: {docId}</div>
 				</div>
 			</div>
 

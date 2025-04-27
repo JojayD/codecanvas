@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 		let bodyData: LeaveRoomRequestBody = {};
 
 		try {
-			bodyData = (await req.json()) as LeaveRoomRequestBody;
+			bodyData = (await req.json());
 			console.log("POST body received:", bodyData);
 		} catch (e) {
 			console.error("Failed to parse POST body:", e);

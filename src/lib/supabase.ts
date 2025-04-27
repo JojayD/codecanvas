@@ -17,6 +17,13 @@ export interface Room {
 	roomStatus?: boolean;
 }
 
+export interface LivekitRoom {
+	id?: number;
+	room_id: number;
+	created_at?: string;
+	sessionToken?: string;
+}
+
 export interface KonvaShape {
 	id: string;
 	type: string;
@@ -76,6 +83,13 @@ export interface UpdateRoomPayload {
 	participants?: string[];
 	roomStatus?: boolean;
 	updated_at?: string;
+}
+
+export interface CreateLivekitRoomPayload {
+	id?: string;
+	room_id: number;
+	created_at?: string;
+	sessionToken?: string;
 }
 
 export const supabase = createClient();
