@@ -358,7 +358,7 @@ export default function Dashboard() {
 							<div className='flex flex-col gap-3'>
 								<h1 className='text-gray-700 font-medium mb-2'>
 									Audio and video are muted when you first join the room, but you can
-									enable or adjust them at any time during the call.3
+									enable or adjust them at any time during the call.
 								</h1>
 								{/* <div className='flex space-x-4 mb-2 gap-4'>
 									<div className='flex items-center space-x-2'>

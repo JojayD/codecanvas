@@ -576,6 +576,8 @@ export async function handleHostExit(
 
 /**
  * Subscribe to room changes
+ * This function sets up a real-time subscription to room changes using Supabase's
+ *	
  */
 export function subscribeToRoom(
 	roomId: string | number,

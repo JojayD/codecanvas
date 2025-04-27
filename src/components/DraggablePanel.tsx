@@ -245,6 +245,7 @@ export default function DraggableVideoChat({
 					height: `${dimensions.height}px`,
 
 					// when visible, use your x/y; when hidden, move it way off screen
+					// top left from what i have seen puts your panel wherever you left it before hiding
 					top: showVideoChat ? 0 : -10000,
 					left: showVideoChat ? 0 : -10000,
 
@@ -324,6 +325,7 @@ function VideoGrid({ minimized }: { minimized: boolean }) {
 			}`}
 			style={{ height: "100%" }}
 		>
+		{/* Renders particapant panel */}
 			{tracks.map((trackReference) => (
 				<ParticipantTile
 					key={trackReference.participant.identity + trackReference.source}
