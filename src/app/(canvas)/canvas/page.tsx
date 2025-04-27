@@ -9,6 +9,8 @@ import Prompt from "../components/Prompt";
 import { supabase } from "@/lib/supabase";
 import React from "react";
 import { withAuthProtection } from "@/app/context/AuthProvider";
+import { Visibility } from "aws-cdk-lib/aws-appsync";
+import { set } from "lodash";
 
 // Dynamically import the CodeEditor component to avoid SSR issues
 const DynamicCodeEditor = dynamic(
@@ -52,7 +54,7 @@ function Canvas() {
 	});
 	const [inCall, setInCall] = useState(true);
 	const [connectionError, setConnectionError] = useState<boolean>(false);
-
+	const [visibility, setVisibility] = useState<boolean>(true);
 	// Add a state to track if the component is safely mounted
 	const [isSafeToJoin, setIsSafeToJoin] = useState(false);
 	const {
@@ -77,7 +79,8 @@ function Canvas() {
 	useEffect(() => {
 		// Check if roomId is present
 		console.log("In call stat changed from Canvas component:", inCall);
-	}, [inCall]);
+		console.log("Show video chat stat changed from Canvas component:", showVideoChat);
+	}, [inCall, showVideoChat]);
 
 	useEffect(() => {
 		if (inCall) {
@@ -519,7 +522,7 @@ function Canvas() {
 						</button>
 					)}
 					<button
-						className='bg-purple-600 hover:bg-green-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
+						className='bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-1 px-3 rounded mr-3'
 						onClick={() => {
 							setShowVideoChat(!showVideoChat);
 						}}
@@ -605,16 +608,16 @@ function Canvas() {
 			</div>
 			<div>
 				{" "}
-				{showVideoChat && (
-					<DynamicVideoChat
-						username={videoSettings.username}
-						audio={videoSettings.audio}
-						video={videoSettings.video}
-						roomName={roomId} // Use the current room ID to keep video in the same context'
-						setInCall={setInCall}
-						inCall={inCall}
-					/>
-				)}
+				<DynamicVideoChat
+					username={videoSettings.username}
+					audio={videoSettings.audio}
+					video={videoSettings.video}
+					roomName={roomId} // Use the current room ID to keep video in the same context'
+					setInCall={setInCall}
+					inCall={inCall}
+					showVideoChat={showVideoChat}
+					className={showVideoChat ? "visible" : "hidden"}
+				/>
 			</div>
 			<div>
 				{connectionError && (

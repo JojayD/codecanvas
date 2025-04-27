@@ -29,6 +29,8 @@ interface DraggableVideoChatProps {
 	roomName?: string;
 	inCall?: boolean;
 	setInCall: (value: boolean) => void;
+	className?: string;
+	showVideoChat?: boolean;
 }
 
 export default function DraggableVideoChat({
@@ -38,6 +40,8 @@ export default function DraggableVideoChat({
 	roomName = "codecanvas-room",
 	inCall = true,
 	setInCall = () => {},
+	className = "",
+	showVideoChat = true,
 }: DraggableVideoChatProps) {
 	const [minimized, setMinimized] = useState(false);
 	const [connectionState, setConnectionState] = useState<ConnectionStateType>(
@@ -181,7 +185,6 @@ export default function DraggableVideoChat({
 	 * Detecting for camera and microphone permissions
 	 */
 
-
 	const leaveCall = () => {
 		roomInstance.disconnect();
 		setInCall(false);
@@ -233,16 +236,22 @@ export default function DraggableVideoChat({
 				}`}
 				style={{
 					boxShadow: "0 0 15px rgba(0,0,0,0.2)",
-					// only transition width/height when minimizing
-					transition: "width 200ms ease, height 200ms ease",
-					transform: "translate3d(0,0,0)", // keep GPU acceleration
+					transition: "width 200ms ease, height 200ms ease, opacity 200ms ease",
+					transform: "translate3d(0,0,0)",
 					willChange: "transform, width, height",
 					touchAction: "none",
 					maxHeight: "calc(100vh - 100px)",
 					width: `${dimensions.width}px`,
 					height: `${dimensions.height}px`,
-					top: 0,
-					left: 0,
+
+					// when visible, use your x/y; when hidden, move it way off screen
+					top: showVideoChat ? 0 : -10000,
+					left: showVideoChat ? 0 : -10000,
+
+					// hide it visually & disable events when “hidden”
+					opacity: showVideoChat ? 1 : 0,
+					pointerEvents: showVideoChat ? "auto" : "none",
+					// remove visibility:hidden entirely
 				}}
 			>
 				<RoomContext.Provider value={roomInstance}>
