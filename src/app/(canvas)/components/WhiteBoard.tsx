@@ -125,33 +125,39 @@ const WhiteBoard = () => {
 					subscription = subscribeToWhiteboardChanges(
 						whiteboard.id,
 						(updatedWhiteboard) => {
-							if (!isLocalChange.current) {
-								// Parse the updated content
-								let updatedContent: WhiteboardContent;
-								if (typeof updatedWhiteboard.content === "string") {
-									updatedContent = parseWhiteboardContent(updatedWhiteboard.content);
-								} else if (
-									typeof updatedWhiteboard.content === "object" &&
-									updatedWhiteboard.content !== null
-								) {
-									const objContent = updatedWhiteboard.content as any;
-									updatedContent = objContent.shapes
-										? (objContent as WhiteboardContent)
-										: createEmptyContent();
-								} else {
-									updatedContent = createEmptyContent();
-								}
+							console.log("Received whiteboard update from server");
 
-								// Only update if the remote version is newer than our local version
-								if (updatedContent.version > content.version) {
-									console.log(
-										"Received newer version from server:",
-										updatedContent.version
-									);
-									setContent(updatedContent);
-									setSelectedId(null);
-								}
+							// Set flag to false to indicate this is a remote update
+							isLocalChange.current = false;
+
+							// Parse the updated content
+							let updatedContent: WhiteboardContent;
+							if (typeof updatedWhiteboard.content === "string") {
+								updatedContent = parseWhiteboardContent(updatedWhiteboard.content);
+							} else if (
+								typeof updatedWhiteboard.content === "object" &&
+								updatedWhiteboard.content !== null
+							) {
+								const objContent = updatedWhiteboard.content as any;
+								updatedContent = objContent.shapes
+									? (objContent as WhiteboardContent)
+									: createEmptyContent();
+							} else {
+								updatedContent = createEmptyContent();
 							}
+
+							// Always update with remote changes, regardless of version
+							// This ensures real-time updates even if versions get out of sync
+							console.log(
+								"Updating whiteboard with remote content. Remote version:",
+								updatedContent.version,
+								"Local version:",
+								content.version
+							);
+
+							// Update the shapes without checking versions
+							setContent(updatedContent);
+							setSelectedId(null);
 
 							// Reset the flag for future updates
 							isLocalChange.current = true;
@@ -773,81 +779,19 @@ const WhiteBoard = () => {
 		} else if (shape.type === "line") {
 			return (
 				<Line
-					{...sharedProps}
 					key={shape.id}
-					draggable={tool === "select"}
+					id={shape.id}
 					points={shape.points}
 					stroke={shape.stroke}
 					strokeWidth={shape.strokeWidth}
-					onClick={(e) => {
-						console.log("🛠️ [Line] onClick:", shape.id, "tool:", tool);
-						if (tool === "select") {
-							setSelectedId(shape.id);
-						}
-					}}
-					onMouseEnter={() => {
-						console.log("🛠️ [Line] onMouseEnter:", shape.id);
-					}}
-					onTap={() => {
-						if (tool === "select") setSelectedId(shape.id);
-					}}
-					onDragStart={(e) => {
-						console.log(
-							"🛠️ [Line] onDragStart:",
-							shape.id,
-							"tool:",
-							tool,
-							"draggable:",
-							tool === "select"
-						);
-						setIsDragging(true);
-						setDraggedId(shape.id);
-
-						// Hide transformer during drag
-						if (transformerRef.current) {
-							transformerRef.current.nodes([]);
-							transformerRef.current.getLayer()?.batchDraw();
-						}
-
-						e.target.setAttrs({
-							shadowOffset: { x: 5, y: 5 },
-							shadowBlur: 10,
-							shadowColor: "rgba(0,0,0,0.3)",
-							shadowOpacity: 0.5,
-						});
-					}}
+					draggable={shape.draggable}
+					onClick={() => setSelectedId(shape.id)}
+					onTap={() => setSelectedId(shape.id)}
 					onDragEnd={(e) => {
-						console.log(
-							"🛠️ [Line] onDragEnd:",
-							shape.id,
-							"tool:",
-							tool,
-							"draggable:",
-							tool === "select"
-						);
-						setIsDragging(false);
-						setDraggedId(null);
-
-						e.target.setAttrs({
-							shadowOffset: { x: 0, y: 0 },
-							shadowBlur: 0,
-							shadowOpacity: 0,
-						});
-
-						// Update position
 						handleUpdateShape(shape.id, {
 							x: e.target.x(),
 							y: e.target.y(),
 						});
-
-						// Restore transformer after drag
-						if (transformerRef.current && selectedId) {
-							const node = layerRef.current?.findOne(`#${selectedId}`);
-							if (node) {
-								transformerRef.current.nodes([node]);
-								transformerRef.current.getLayer()?.batchDraw();
-							}
-						}
 					}}
 				/>
 			);
@@ -946,8 +890,9 @@ const WhiteBoard = () => {
 						cursor: tool === "eraser" ? "none" : "default",
 						touchAction: "none",
 					}}
-					draggable={tool === "select"}
-					dragBoundFunc={(pos) => pos}
+					// Disable stage dragging to prevent offset issues
+					draggable={false}
+					// Remove dragBoundFunc since we're disabling dragging
 					perfectDrawEnabled={false}
 					listening={true}
 				>

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ export default function Dashboard() {
 	const [userName, setUserName] = useState("");
 	const [enableAudio, setEnableAudio] = useState(true);
 	const [enableCamera, setEnableCamera] = useState(true);
+	const [showUpdates, setShowUpdates] = useState(false);
+	const updatesDropdownRef = useRef<HTMLDivElement>(null);
 	const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setUserName(e.target.value);
 	};
@@ -32,6 +34,25 @@ export default function Dashboard() {
 		console.log("enableCamera changed:", enableCamera);
 	}, [enableAudio, enableCamera]);
 
+	/**
+	 *  useEffect to check handle outside clicks for the dropdown
+	 */
+
+	// useEffect(() => {
+	// 	function handleClickOutside(event: MouseEvent) {
+	// 		if (
+	// 			updatesDropdownRef.current &&
+	// 			!updatesDropdownRef.current.contains(event.target as Node)
+	// 		) {
+	// 			setShowUpdates(false);
+	// 		}
+	// 	}
+
+	// 	document.addEventListener("mousedown", handleClickOutside);
+	// 	return () => {
+	// 		document.removeEventListener("mousedown", handleClickOutside);
+	// 	};
+	// }, [updatesDropdownRef]);
 	// Add this function after your other functions
 	const handlegoToTestVideoRoom = () => {
 		if (!userName.trim()) {
@@ -159,13 +180,53 @@ export default function Dashboard() {
 							className='w-auto h-16' // Dynamic height
 						/>
 					</div>
-					<Button
-						onClick={handleLogout}
-						variant='outline'
-						className='bg-red-600 text-white'
-					>
-						Logout
-					</Button>
+					<div>
+						<Button
+							onClick={() => setShowUpdates(!showUpdates)}
+							variant='outline'
+							className='bg-green-500 text-white hover:bg-green-700 mr-2'
+						>
+							Updates ✨
+						</Button>
+
+						{showUpdates && (
+							<div
+								ref={updatesDropdownRef}
+								className='absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg z-50 overflow-hidden'
+								style={{ maxHeight: "400px" }}
+							>
+								<div className='py-2 px-3 bg-blue-600 text-white font-medium'>
+									Patch Updates
+								</div>
+								<div className='max-h-80 overflow-y-auto'>
+									<div className='p-3'>
+										<div className='font-medium'>v1.1 - April 27, 2025</div>
+										<ul className='mt-1 text-sm text-gray-700 ml-4 list-disc space-y-1'>
+											<li>Real-time video chat</li>
+											<li>Improved UI/UX design</li>
+											<li>Removed shapes for simplicity</li>
+										</ul>
+									</div>
+									<div className='p-3'>
+										<div className='font-medium'>v1.0 - April 21, 2025</div>
+										<ul className='mt-1 text-sm text-gray-700 ml-4 list-disc space-y-1'>
+											<li>Initial release of CodeCanvas</li>
+											<li>Basic code collaboration features</li>
+											<li>Prompt, Whiteboard, Coding IDE</li>
+										</ul>
+									</div>
+								</div>
+							</div>
+						)}
+
+						<Button
+							onClick={handleLogout}
+							variant='outline'
+							className='bg-red-600 text-white'
+						>
+							Logout
+						</Button>
+					</div>
 				</div>
 			</header>
 

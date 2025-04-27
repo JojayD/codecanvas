@@ -6,11 +6,11 @@ const PatchNotes = () => {
 	const router = useRouter();
 
 	return (
-		<div className='w-full min-h-screen p-6 flex flex-col justify-center items-center bg-gray-100'>
-			{/* Main container taking full width */}
-			<div className='relative w-full bg-white rounded-lg shadow-xl'>
+		<div className='w-full min-h-screen bg-gray-100'>
+			{/* Main container with max width and center alignment */}
+			<div className='relative max-w-5xl mx-auto my-8 bg-white rounded-lg shadow-xl h-[calc(100vh-4rem)]'>
 				{/* Header with buttons */}
-				<div className='absolute top-0 left-0 w-full h-6 bg-gray-200 rounded-t-lg flex items-center px-2'>
+				<div className='sticky top-0 w-full h-8 bg-gray-200 rounded-t-lg flex items-center px-2'>
 					<div className='flex space-x-1'>
 						<div
 							className='w-3 h-3 rounded-full bg-red-500 cursor-pointer'
@@ -28,19 +28,64 @@ const PatchNotes = () => {
 							title='Maximize'
 						></div>
 					</div>
+					<div className='flex-1 text-center text-xs text-gray-500'>
+						Code Canvas - Patch Notes
+					</div>
 				</div>
-				{/* Content */}
-				<div>
-					<h1 className='text-3xl font-bold mb-4'>Patch Notes</h1>
-					<h2>Code Canvas 2.0</h2>
-					<ul>
-						<li className='mb-2'></li>
-						<strong>New Features:</strong>
-						<ul className='list-disc ml-6'>
-							<li>User can now start calls during the interview</li>
-							<li>Improved UI/UX design</li>
-						</ul>
-					</ul>
+
+				{/* Content with scrolling */}
+				<div className='p-8 overflow-y-auto h-[calc(100%-2rem)]'>
+					<h1 className='text-4xl font-bold mb-6 text-blue-700'>Patch Notes</h1>
+
+					<div className='mb-10'>
+						<h2 className='text-2xl font-bold mb-4 text-blue-600'>
+							Code Canvas 1.1{" "}
+							<span className='text-sm text-gray-500 font-normal'>
+								(April 27, 2025)
+							</span>
+						</h2>
+						<div className='border-l-4 border-blue-500 pl-4 mb-6'>
+							<h3 className='font-bold text-lg mb-2'>New Features:</h3>
+							<ul className='list-disc ml-6 space-y-2'>
+								<li>User can now start video calls during coding interviews</li>
+								<li>Improved UI/UX design with responsive layouts</li>								
+							</ul>
+						</div>
+
+						<div className='border-l-4 border-green-500 pl-4 mb-6'>
+							<h3 className='font-bold text-lg mb-2'>Improvements:</h3>
+							<ul className='list-disc ml-6 space-y-2'>
+								<li>Enhanced performance for real-time collaboration</li>
+								<li>Better error handling for network disruptions</li>
+								<li>Added support for more programming languages</li>
+							</ul>
+						</div>
+
+						<div className='border-l-4 border-red-500 pl-4'>
+							<h3 className='font-bold text-lg mb-2'>Bug Fixes:</h3>
+							<ul className='list-disc ml-6 space-y-2'>
+								<li>Fixed authentication token expiration handling</li>
+							</ul>
+						</div>
+					</div>
+
+					<div className='mb-10'>
+						<h2 className='text-2xl font-bold mb-4 text-blue-600'>
+							Code Canvas 1.0{" "}
+							<span className='text-sm text-gray-500 font-normal'>
+								(April 1, 2025)
+							</span>
+						</h2>
+						<div className='border-l-4 border-blue-500 pl-4'>
+							<h3 className='font-bold text-lg mb-2'>Initial Release:</h3>
+							<ul className='list-disc ml-6 space-y-2'>
+								<li>Basic code editor with syntax highlighting</li>
+								<li>Room-based collaboration system</li>
+								<li>Simple user authentication</li>
+								<li>Text-based communication</li>
+							</ul>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
