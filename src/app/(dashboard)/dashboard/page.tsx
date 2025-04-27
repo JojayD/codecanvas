@@ -11,7 +11,6 @@ import { getUserId } from "@/app/utils/supabase/lib/supabaseGetUserId";
 import Image from "next/image";
 import { CiCamera } from "react-icons/ci";
 import { AiFillAudio } from "react-icons/ai";
-
 export default function Dashboard() {
 	const router = useRouter();
 	const [roomIdInput, setRoomIdInput] = useState("");
@@ -24,7 +23,10 @@ export default function Dashboard() {
 		setUserName(e.target.value);
 	};
 
-	
+	/**
+	 * UseEfect to check permission status
+	 */
+
 	useEffect(() => {
 		console.log("enableAudio changed:", enableAudio);
 		console.log("enableCamera changed:", enableCamera);
@@ -352,11 +354,13 @@ export default function Dashboard() {
 									</Button>
 								</div>
 							</div>
+							{/* Media options section */}
 							<div className='flex flex-col gap-3'>
 								<h1 className='text-gray-700 font-medium mb-2'>
-									Media options for your room
+									Audio and video are muted when you first join the room, but you can
+									enable or adjust them at any time during the call.3
 								</h1>
-								<div className='flex space-x-4 mb-2 gap-4'>
+								{/* <div className='flex space-x-4 mb-2 gap-4'>
 									<div className='flex items-center space-x-2'>
 										<input
 											type='checkbox'
@@ -399,8 +403,9 @@ export default function Dashboard() {
 									}}
 								>
 									camera room test
-								</button>
+								</button> */}
 							</div>
+							{/**End of media options */}
 						</div>
 					</div>
 				</div>

@@ -177,6 +177,11 @@ export default function DraggableVideoChat({
 		setMinimized(!minimized);
 	};
 
+	/**
+	 * Detecting for camera and microphone permissions
+	 */
+
+
 	const leaveCall = () => {
 		roomInstance.disconnect();
 		setInCall(false);
