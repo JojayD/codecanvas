@@ -26,6 +26,8 @@
 		"@supabase/auth-helpers-nextjs": "^0.10.0",
 		"@supabase/ssr": "^0.6.1",
 		"@supabase/supabase-js": "^2.49.4",
+		"@tldraw/editor": "^3.12.1",
+		"@tldraw/tldraw": "^3.12.1",
 		"@types/uuid": "^10.0.0",
 		"aws-amplify": "^6.13.6",
 		"axios": "^1.8.4",

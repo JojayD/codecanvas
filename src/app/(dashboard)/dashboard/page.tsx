@@ -11,6 +11,7 @@ import { getUserId } from "@/app/utils/supabase/lib/supabaseGetUserId";
 import Image from "next/image";
 import { CiCamera } from "react-icons/ci";
 import { AiFillAudio } from "react-icons/ai";
+import Link from "next/link";
 export default function Dashboard() {
 	const router = useRouter();
 	const [roomIdInput, setRoomIdInput] = useState("");

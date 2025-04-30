@@ -9,8 +9,6 @@ import Prompt from "../components/Prompt";
 import { supabase } from "@/lib/supabase";
 import React from "react";
 import { withAuthProtection } from "@/app/context/AuthProvider";
-import { Visibility } from "aws-cdk-lib/aws-appsync";
-import { set } from "lodash";
 
 // Dynamically import the CodeEditor component to avoid SSR issues
 const DynamicCodeEditor = dynamic(
@@ -23,10 +21,9 @@ const DynamicVideoChat = dynamic(() => import("@/components/DraggablePanel"), {
 	ssr: false,
 });
 
-// Import WhiteBoard with the correct Next.js dynamic import pattern
-// This fixes the 'canvas' module not found error (GitHub issue #102)
+// Import TLDraw whiteboard
 const DynamicWhiteBoard = dynamic(
-	() => import("@/app/(canvas)/components/WhiteBoard"),
+	() => import("@/app/(canvas)/components/WhiteBoardTLDraw"),
 	{
 		ssr: false,
 		loading: () => (
@@ -79,7 +76,10 @@ function Canvas() {
 	useEffect(() => {
 		// Check if roomId is present
 		console.log("In call stat changed from Canvas component:", inCall);
-		console.log("Show video chat stat changed from Canvas component:", showVideoChat);
+		console.log(
+			"Show video chat stat changed from Canvas component:",
+			showVideoChat
+		);
 	}, [inCall, showVideoChat]);
 
 	useEffect(() => {
