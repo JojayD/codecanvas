@@ -194,3 +194,14 @@ body {
 .SplitPane {
 	position: relative !important;
 }
+
+.yellow-camera-controls button {
+  color: yellow !important;
+  fill: yellow !important;
+  stroke: yellow !important;
+}
+.yellow-camera-controls svg {
+  color: yellow !important;
+  fill: yellow !important;
+  stroke: yellow !important;
+}
