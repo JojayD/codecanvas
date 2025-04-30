@@ -285,15 +285,9 @@ export default function DraggableVideoChat({
 							<div className='absolute bottom-0 left-0 right-0 bg-opacity-7'>
 								<ControlBar
 									variation='minimal'
-									className='w-full'
+									className='w-full yellow-camera-controls'
 									controls={{ camera: true, microphone: true }}
-									style={
-										{
-											"--lk-control-bar-button-color": "white",
-											"--lk-button-background-color": "transparent",
-											width: "100%",
-										} as React.CSSProperties
-									}
+									style={{ width: "100%" } as React.CSSProperties}
 								/>
 							</div>
 						)}
@@ -325,7 +319,7 @@ function VideoGrid({ minimized }: { minimized: boolean }) {
 			}`}
 			style={{ height: "100%" }}
 		>
-		{/* Renders particapant panel */}
+			{/* Renders particapant panel */}
 			{tracks.map((trackReference) => (
 				<ParticipantTile
 					key={trackReference.participant.identity + trackReference.source}
