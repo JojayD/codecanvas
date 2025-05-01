@@ -35,50 +35,6 @@ export default function Dashboard() {
 		console.log("enableCamera changed:", enableCamera);
 	}, [enableAudio, enableCamera]);
 
-	/**
-	 *  useEffect to check handle outside clicks for the dropdown
-	 */
-
-	// useEffect(() => {
-	// 	function handleClickOutside(event: MouseEvent) {
-	// 		if (
-	// 			updatesDropdownRef.current &&
-	// 			!updatesDropdownRef.current.contains(event.target as Node)
-	// 		) {
-	// 			setShowUpdates(false);
-	// 		}
-	// 	}
-
-	// 	document.addEventListener("mousedown", handleClickOutside);
-	// 	return () => {
-	// 		document.removeEventListener("mousedown", handleClickOutside);
-	// 	};
-	// }, [updatesDropdownRef]);
-	// Add this function after your other functions
-	const handlegoToTestVideoRoom = () => {
-		if (!userName.trim()) {
-			setError("Please enter a username");
-			return;
-		}
-
-		// Save username and media preferences to localStorage
-		localStorage.setItem("username", userName);
-		localStorage.setItem("enableAudio", enableAudio.toString());
-		localStorage.setItem("enableCamera", enableCamera.toString());
-
-		// Create a media state object
-		const mediaState = {
-			audio: enableAudio,
-			video: enableCamera,
-			username: userName,
-		};
-
-		// Encode the JSON as a URL parameter
-		const encodedState = encodeURIComponent(JSON.stringify(mediaState));
-
-		// Navigate to a test room with the state
-		router.push(`/cameraRoom?state=${encodedState}`);
-	};
 
 	const createNewRoom = async () => {
 		try {
@@ -182,6 +138,12 @@ export default function Dashboard() {
 						/>
 					</div>
 					<div>
+						<Button
+							variant='outline'
+							className='bg-orange-500 text-white hover:bg-orange-700 mr-2'
+						>
+							Recordings
+						</Button>
 						<Button
 							onClick={() => setShowUpdates(!showUpdates)}
 							variant='outline'

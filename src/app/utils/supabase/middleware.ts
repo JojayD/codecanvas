@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { type CookieOptions } from "@supabase/ssr";
 
-const protectedRoutes = ["/dashboard"];
+const protectedRoutes = ["/dashboard", "/recordings"];
 const unauthenticatedRoutes = [
 	"/login",
 	"/policy",
