@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ReactTyped } from "react-typed";
+import { SparklesText } from "@/components/magicui/sparkles-text";
 type Props = {};
 
 const typedSentences = [
@@ -13,7 +14,6 @@ const typedSentences = [
 
 export default function page({}: Props) {
 	const router = useRouter();
-
 
 	const handleBack = () => {
 		console.log("Back button clicked");
@@ -90,7 +90,7 @@ export default function page({}: Props) {
 					<div className='bg-white bg-opacity-80 backdrop-blur-lg p-8 rounded-xl shadow-xl border border-white border-opacity-20 transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl'>
 						<div className='text-blue-800 mb-4 text-3xl'>
 							<span className='inline-block p-3 rounded-full bg-blue-100 bg-opacity-80'>
-								🖥️
+								🧑🏻‍🏫
 							</span>
 						</div>
 						<h2 className='text-2xl font-bold text-black mb-3'>
@@ -105,13 +105,16 @@ export default function page({}: Props) {
 					<div className='bg-white bg-opacity-80 backdrop-blur-lg p-8 rounded-xl shadow-xl border border-white border-opacity-20 transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl'>
 						<div className='text-blue-800 mb-4 text-3xl'>
 							<span className='inline-block p-3 rounded-full bg-blue-100 bg-opacity-80'>
-								🚀
+								📷
 							</span>
 						</div>
-						<h2 className='text-2xl font-bold text-black mb-3'>Reliable & Fast</h2>
+						<h2 className='text-2xl font-bold text-black mb-3'>
+							<SparklesText className="text-3xl">Realtime</SparklesText> Camera
+						</h2>
 						<p className='text-gray-800'>
-							Engineered for low-latency communication, Code Canvas supports
-							high-intensity collaboration for teams of any size.
+							Our interactive whiteboard is designed for live technical interviews and
+							pair programming. It allows you to share your code with your interviewer
+							in real-time.
 						</p>
 					</div>
 				</div>
@@ -146,6 +149,21 @@ export default function page({}: Props) {
 							prepares you for real-world technical challenges.
 						</p>
 					</div>
+				</div>
+				{/* Third row with two items */}
+				<div className='grid grid-cols-1 md:grid-cols-2 gap-8 mt-10'></div>
+
+				<div className='bg-white bg-opacity-80 backdrop-blur-lg p-8 rounded-xl shadow-xl border border-white border-opacity-20 transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl'>
+					<div className='text-blue-800 mb-4 text-3xl'>
+						<span className='inline-block p-3 rounded-full bg-blue-100 bg-opacity-80'>
+							🚀
+						</span>
+					</div>
+					<h2 className='text-2xl font-bold text-black mb-3'>Reliable & Fast</h2>
+					<p className='text-gray-800'>
+						Engineered for low-latency communication, Code Canvas supports
+						high-intensity collaboration for teams of any size.
+					</p>
 				</div>
 			</div>
 		</div>

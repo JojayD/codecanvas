@@ -48,7 +48,8 @@ const PatchNotes = () => {
 							<h3 className='font-bold text-lg mb-2'>New Features:</h3>
 							<ul className='list-disc ml-6 space-y-2'>
 								<li>User can now start video calls during coding interviews</li>
-								<li>Improved UI/UX design with responsive layouts</li>								
+								<li>New Whiteboard by tldraw</li>								
+								<li>Improved UI/UX design with responsive layouts</li>
 							</ul>
 						</div>
 
