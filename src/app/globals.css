@@ -196,14 +196,14 @@ body {
 }
 
 .yellow-camera-controls button {
-  color: yellow !important;
-  fill: yellow !important;
-  stroke: yellow !important;
+	color: yellow !important;
+	fill: yellow !important;
+	stroke: yellow !important;
 }
 .yellow-camera-controls svg {
-  color: yellow !important;
-  fill: yellow !important;
-  stroke: yellow !important;
+	color: yellow !important;
+	fill: yellow !important;
+	stroke: yellow !important;
 }
 
 .custom-layout {
@@ -233,7 +233,42 @@ body {
 	border-radius: 64px;
 }
 
-.custom-button[data-isactive='true'] {
+.custom-button[data-isactive="true"] {
 	background-color: black;
 	color: white;
+}
+
+.embla__dots {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.embla__dot {
+	width: 0.75rem;
+	height: 0.75rem;
+	border-radius: 50%;
+	background-color: #cbd5e1;
+	cursor: pointer;
+	transition: background-color 0.2s;
+}
+
+.embla__dot--selected {
+	background-color: #3b82f6;
+}
+
+.embla__buttons {
+	display: flex;
+	gap: 1rem;
+}
+
+.embla__button {
+	border: none;
+	background-color: transparent;
+	cursor: pointer;
+	padding: 0.5rem;
+}
+
+.embla__button:disabled {
+	opacity: 0.3;
+	cursor: default;
 }

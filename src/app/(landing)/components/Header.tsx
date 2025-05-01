@@ -27,6 +27,12 @@ const Header = () => {
 								About
 							</Link>
 							<Link
+								href='/updates'
+								className='text-white hover:text-cyan-100 px-3 py-2 text-sm font-medium rounded-md transition duration-300'
+							>
+								Updates
+							</Link>
+							<Link
 								href='/login'
 								className='text-white hover:text-cyan-100 px-4 py-2 text-sm font-medium rounded-md transition duration-300'
 							>
