@@ -138,12 +138,12 @@ export default function Dashboard() {
 						/>
 					</div>
 					<div>
-						<Button
+						{/* <Button
 							variant='outline'
 							className='bg-orange-500 text-white hover:bg-orange-700 mr-2'
 						>
 							Recordings
-						</Button>
+						</Button> */}
 						<Button
 							onClick={() => setShowUpdates(!showUpdates)}
 							variant='outline'
