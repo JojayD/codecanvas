@@ -1,14 +1,14 @@
-//src/lib/s3.ts
-import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { NextRequest, NextResponse } from "next/server";
+import { S3Client, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+import { supabase } from "@/lib/supabase";
+import { log } from "console";
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { NextRequest, NextResponse } from 'next/server';
-import { log, error } from 'console';
 
 
-export async function presignUpload(key: string, contentType = 'video/webm') {
+
+export async function presignUpload(key: string) {
   const s3 = new S3Client({
-    region: process.env.AWS_REGION || 'us-east-2',
+    region: 'us-east-2',
     credentials: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
@@ -19,7 +19,7 @@ export async function presignUpload(key: string, contentType = 'video/webm') {
   const command = new PutObjectCommand({
     Bucket: "code-canvas-recordings",
     Key: key,
-    ContentType: contentType,
+    ContentType: "video/webm",
   });
 
   const signedUrl = await getSignedUrl(s3, command, {
@@ -68,10 +68,43 @@ export async function verifyS3Access() {
   }
 }
 
-// export async function presignDownload(key: string) {
-//   const command = new GetObjectCommand({
-//     Bucket: process.env.AWS_S3_BUCKET!,
-//     Key: key,
-//   });
-//   return getSignedUrl(s3, command, { expiresIn: +process.env.S3_PRESIGN_EXPIRY! });
-// }
+
+
+const s3 = new S3Client({
+  region: "us-east-2",
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
+// Verify S3 access when the module is loaded
+
+export async function POST(request: NextRequest) {
+  console.log("Request received");
+  try {
+    const { fileName, userId } = await request.json();
+    await verifyS3Access();
+    if (!fileName) {
+      return NextResponse.json(
+        { error: "Missing fileName" },
+        { status: 400 }
+      );
+    }
+    console.log("User data:", userId);
+    // Get file name and bucket name from request
+    const objectKey = `${userId ?? 'anonymous'}/${fileName}`
+    // Explicitly pass video/webm as the content type for recordings
+    const presignedUrl = await presignUpload(objectKey)
+    console.log("Presigned URL:", presignedUrl);
+    log("Presigned URL on s3-bucket-upload/route.ts:", presignedUrl);
+    // Return the URL as a simple string value, not a complex object
+    return NextResponse.json({ url: presignedUrl });
+  } catch (error) {
+    console.error(error);
+    // Fix: Return 500 error instead of misleading 405 method not allowed
+    return NextResponse.json(
+      { error: "Failed to generate presigned URL" },
+      { status: 500 }
+    );
+  }
+}

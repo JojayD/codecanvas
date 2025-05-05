@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, RefObject } from "react";
 import { useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import {
 	ControlBar,
 	ParticipantTile,
@@ -43,10 +44,17 @@ export default function DraggableVideoChat({
 	className = "",
 	showVideoChat = true,
 }: DraggableVideoChatProps) {
+	//Going to start the add recording on the draggable panel
+	const [isRecording, setIsRecording] = useState(false);
 	const [minimized, setMinimized] = useState(false);
 	const [connectionState, setConnectionState] = useState<ConnectionStateType>(
 		ConnectionStateType.Disconnected
 	);
+	const [chunks, setChunks] = useState<Blob[]>([]);
+	const [mediaRecorderRef, setMediaRecorderRef] = useState<MediaRecorder | null>(
+		null
+	);
+
 	const [roomInstance] = useState(
 		() =>
 			new Room({
@@ -62,7 +70,168 @@ export default function DraggableVideoChat({
 
 	// Use a more specific type declaration for the ref with explicit cast
 	const nodeRef = useRef<HTMLDivElement>(null) as RefObject<HTMLElement>;
+	const startRecording = async () => {
+		try {
+			// If already recording, stop it
+			if (isRecording) {
+				console.log("Stopping recording...");
+				if (mediaRecorderRef) {
+					mediaRecorderRef.stop();
+				}
+				setIsRecording(false);
+				return;
+			}
 
+			// Start new recording
+			console.log("Starting recording...");
+
+			// Create a new MediaStream
+			const combinedStream = new MediaStream();
+
+			// FIRST: Get screen capture stream with system audio if possible
+			try {
+				const displayMediaOptions = {
+					video: {
+						cursor: "always",
+						displaySurface: "monitor",
+						logicalSurface: true,
+						frameRate: 30,
+					},
+					audio: {
+						echoCancellation: true,
+						noiseSuppression: true,
+						sampleRate: 44100,
+					},
+					selfBrowserSurface: "include",
+				};
+
+				console.log("Requesting screen capture...");
+				const screenStream =
+					await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+
+				// Add all screen tracks to our stream
+				screenStream.getTracks().forEach((track) => {
+					console.log(`Adding screen track: ${track.kind}`);
+					combinedStream.addTrack(track);
+				});
+			} catch (error) {
+				console.error("Error capturing screen:", error);
+				alert(
+					"Screen capture is required for recording. Please allow screen sharing."
+				);
+				return;
+			}
+
+			// SECOND: Add LiveKit participant audio if available and connected
+			if (
+				roomInstance.state === ConnectionStateType.Connected &&
+				roomInstance.localParticipant
+			) {
+				try {
+					const trackPublications = Array.from(
+						roomInstance.localParticipant.trackPublications.values()
+					);
+
+					// Add microphone audio tracks to the combined stream
+					trackPublications.forEach((publication) => {
+						if (
+							publication.track &&
+							publication.track.mediaStreamTrack &&
+							publication.track.kind === "audio"
+						) {
+							console.log("Adding LiveKit audio track");
+							combinedStream.addTrack(publication.track.mediaStreamTrack);
+						}
+					});
+				} catch (error) {
+					console.log("No LiveKit audio tracks available:", error);
+					// Continue without LiveKit audio
+				}
+			}
+
+			// Prepare to store recording chunks
+			const newChunks: Blob[] = [];
+			setChunks(newChunks);
+
+			// Configure media recorder with best codec options
+			const mimeType = "video/webm;codecs=vp9,opus";
+			const mediaRecorder = new MediaRecorder(combinedStream, {
+				mimeType,
+				videoBitsPerSecond: 3000000, // 3 Mbps for good quality
+			});
+
+			// Handle recording data
+			mediaRecorder.ondataavailable = (e) => {
+				if (e.data.size > 0) {
+					newChunks.push(e.data);
+					console.log(`Recorded chunk: ${e.data.size} bytes`);
+				}
+			};
+
+			// Get current user ID for organizing recordings
+			const getUserId = async () => {
+				const {
+					data: { user },
+				} = await supabase.auth.getUser();
+				return user?.id || "anonymous";
+			};
+
+			// Handle recording stop and upload
+			mediaRecorder.onstop = async () => {
+				// Stop all tracks we're recording from
+				combinedStream.getTracks().forEach((track) => track.stop());
+
+				const userId = await getUserId();
+				console.log("Getting our userId", userId);
+
+				// Create final recording blob
+				const recordingBlob = new Blob(newChunks, { type: "video/webm" });
+
+				try {
+					// Create form data for direct upload
+					const formData = new FormData();
+					formData.append("file", recordingBlob);
+					formData.append("userId", userId);
+
+					console.log("Uploading recording directly to server...");
+
+					// Show progress indicator to user
+					alert("Recording complete. Starting upload...");
+
+					const response = await fetch("/api/s3-upload-direct", {
+						method: "POST",
+						body: formData,
+					});
+
+					const result = await response.json();
+
+					if (response.ok) {
+						console.log("Recording uploaded successfully!", result.url);
+						alert("Recording uploaded successfully!");
+					} else {
+						throw new Error(result.error || "Upload failed");
+					}
+				} catch (error: any) {
+					console.error("Error uploading recording:", error);
+					alert(`Error uploading recording: ${error.message}`);
+				}
+			};
+
+			// Save reference to recorder
+			setMediaRecorderRef(mediaRecorder);
+
+			// Start recording with 1-second chunks
+			mediaRecorder.start(1000);
+			console.log("Recording started!");
+
+			// Update state to show recording is active
+			setIsRecording(true);
+		} catch (error: any) {
+			console.error("Recording error:", error);
+			alert(`Recording error: ${error.message}`);
+			setIsRecording(false);
+		}
+	};
 	// Make position updates more immediate with a lower throttle time
 	useEffect(() => {
 		if (!roomInstance) return;
@@ -105,7 +274,6 @@ export default function DraggableVideoChat({
 		const height = minimized ? 144 : 256;
 		setDimensions({ width, height });
 
-		// Ensure the panel is always visible in the viewport
 		// Use a fixed position in the top-right visible area
 		const safeX = Math.max(
 			20,
@@ -258,14 +426,15 @@ export default function DraggableVideoChat({
 				<RoomContext.Provider value={roomInstance}>
 					<div className='drag-handle flex items-center justify-between bg-purple-600 px-2 py-1 cursor-move text-white text-xs'>
 						<ConnectionStateUI />
-						{/* {isConnected && (
+						<div className='flex space-x-1'>
+							{/* Add recording button here */}
 							<button
-								onClick={leaveCall}
-								className='text-white hover:bg-red-700 rounded p-1 mr-2'
+								onClick={startRecording}
+								className='text-white hover:bg-red-700 rounded p-1'
 							>
-								Leave Call
+								{isRecording ? "■" : "●"}
 							</button>
-						)} */}
+						</div>
 						<div className='flex space-x-1'>
 							<button
 								onClick={toggleMinimize}
