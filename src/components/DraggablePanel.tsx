@@ -22,6 +22,7 @@ import Draggable, {
 	DraggableData,
 } from "react-draggable";
 import throttle from "lodash/throttle";
+import FileNamingModal from "./FileNamingModal";
 
 interface DraggableVideoChatProps {
 	username: string;
@@ -50,6 +51,10 @@ export default function DraggableVideoChat({
 	const [connectionState, setConnectionState] = useState<ConnectionStateType>(
 		ConnectionStateType.Disconnected
 	);
+
+	const [showNamingModal, setShowNamingModal] = useState(false);
+	const [customFileName, setCustomFileName] = useState("");
+	const [pendingRecording, setPendingRecording] = useState<Blob | null>(null);
 	const [chunks, setChunks] = useState<Blob[]>([]);
 	const [mediaRecorderRef, setMediaRecorderRef] = useState<MediaRecorder | null>(
 		null
@@ -181,40 +186,12 @@ export default function DraggableVideoChat({
 				// Stop all tracks we're recording from
 				combinedStream.getTracks().forEach((track) => track.stop());
 
-				const userId = await getUserId();
-				console.log("Getting our userId", userId);
-
-				// Create final recording blob
+				// Create final recording blob from chunks
 				const recordingBlob = new Blob(newChunks, { type: "video/webm" });
 
-				try {
-					// Create form data for direct upload
-					const formData = new FormData();
-					formData.append("file", recordingBlob);
-					formData.append("userId", userId);
-
-					console.log("Uploading recording directly to server...");
-
-					// Show progress indicator to user
-					alert("Recording complete. Starting upload...");
-
-					const response = await fetch("/api/s3-upload-direct", {
-						method: "POST",
-						body: formData,
-					});
-
-					const result = await response.json();
-
-					if (response.ok) {
-						console.log("Recording uploaded successfully!", result.url);
-						alert("Recording uploaded successfully!");
-					} else {
-						throw new Error(result.error || "Upload failed");
-					}
-				} catch (error: any) {
-					console.error("Error uploading recording:", error);
-					alert(`Error uploading recording: ${error.message}`);
-				}
+				// Store the blob and show naming modal
+				setPendingRecording(recordingBlob);
+				setShowNamingModal(true);
 			};
 
 			// Save reference to recorder
@@ -387,83 +364,194 @@ export default function DraggableVideoChat({
 	};
 	const isConnected = connectionState === ConnectionStateType.Connected;
 
+	// Add the function to handle upload with custom filename
+	const handleUploadWithCustomName = async (customName: string) => {
+		try {
+			if (!pendingRecording) {
+				console.log("No pending recording to upload");
+				return;
+			}
+
+			const userId = await getUserId();
+			console.log("Getting our userId", userId);
+
+			// Clean up the custom name to remove special characters
+			const safeCustomName = customName.replace(/[^\w\s-]/g, "").trim();
+
+			// Include timestamp for uniqueness but put custom name first
+			const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+			const fileName = `${safeCustomName}-${timestamp}.webm`;
+			console.log("Recording saved as:", fileName);
+
+			// Step 1: Get presigned URL from server using s3-bucket endpoint
+			console.log("Requesting upload URL...");
+			const response = await fetch("/api/s3-bucket", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ fileName, userId }),
+			});
+
+			if (!response.ok) {
+				throw new Error(`API error: ${response.status}`);
+			}
+
+			const data = await response.json();
+			console.log("Got presigned URL:", data.url);
+
+			// Step 2: Upload directly to S3 using XMLHttpRequest
+			console.log("Uploading to S3...");
+
+			// Show upload in progress message
+			alert("Starting upload with name: " + safeCustomName);
+
+			// Create a promise to handle the upload asynchronously
+			const uploadPromise = new Promise((resolve, reject) => {
+				const xhr = new XMLHttpRequest();
+				xhr.open("PUT", data.url);
+				xhr.setRequestHeader("Content-Type", "video/webm");
+
+				// Handle upload progress
+				xhr.upload.onprogress = (event) => {
+					if (event.lengthComputable) {
+						const percentComplete = Math.round((event.loaded / event.total) * 100);
+						console.log(`Upload progress: ${percentComplete}%`);
+					}
+				};
+
+				// Handle success
+				xhr.onload = () => {
+					if (xhr.status >= 200 && xhr.status < 300) {
+						console.log("Upload successful:", xhr.status);
+						resolve(xhr.response);
+					} else {
+						console.error("Upload failed:", xhr.status, xhr.statusText);
+						reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+					}
+				};
+
+				// Handle errors
+				xhr.onerror = () => {
+					console.error("Network error during upload");
+					reject(new Error("Network error during upload"));
+				};
+
+				// Send the blob
+				xhr.send(pendingRecording);
+			});
+
+			await uploadPromise;
+			console.log("Recording uploaded successfully!");
+			alert("Recording uploaded successfully!");
+
+			// Clear the pending recording
+			setPendingRecording(null);
+		} catch (error: any) {
+			console.error("Error uploading recording:", error);
+			alert(`Error uploading recording: ${error.message}`);
+			setPendingRecording(null);
+		}
+	};
+
+	// Get user ID helper function
+	const getUserId = async () => {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		return user?.id || "anonymous";
+	};
+
 	return (
-		<Draggable
-			nodeRef={nodeRef}
-			handle='.drag-handle'
-			position={position}
-			bounds='body'
-			onDrag={handleDrag}
-			positionOffset={{ x: 0, y: 0 }}
-			scale={1}
-		>
-			<div
-				ref={nodeRef as React.RefObject<HTMLDivElement>}
-				className={`fixed z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-200 ${
-					minimized ? "w-60 h-36" : "w-100 h-64"
-				}`}
-				style={{
-					boxShadow: "0 0 15px rgba(0,0,0,0.2)",
-					transition: "width 200ms ease, height 200ms ease, opacity 200ms ease",
-					transform: "translate3d(0,0,0)",
-					willChange: "transform, width, height",
-					touchAction: "none",
-					maxHeight: "calc(100vh - 100px)",
-					width: `${dimensions.width}px`,
-					height: `${dimensions.height}px`,
-
-					// when visible, use your x/y; when hidden, move it way off screen
-					// top left from what i have seen puts your panel wherever you left it before hiding
-					top: showVideoChat ? 0 : -10000,
-					left: showVideoChat ? 0 : -10000,
-
-					// hide it visually & disable events when “hidden”
-					opacity: showVideoChat ? 1 : 0,
-					pointerEvents: showVideoChat ? "auto" : "none",
-					// remove visibility:hidden entirely
-				}}
+		<>
+			<Draggable
+				nodeRef={nodeRef}
+				handle='.drag-handle'
+				position={position}
+				bounds='body'
+				onDrag={handleDrag}
+				positionOffset={{ x: 0, y: 0 }}
+				scale={1}
 			>
-				<RoomContext.Provider value={roomInstance}>
-					<div className='drag-handle flex items-center justify-between bg-purple-600 px-2 py-1 cursor-move text-white text-xs'>
-						<ConnectionStateUI />
-						<div className='flex space-x-1'>
-							{/* Add recording button here */}
-							<button
-								onClick={startRecording}
-								className='text-white hover:bg-red-700 rounded p-1'
-							>
-								{isRecording ? "■" : "●"}
-							</button>
-						</div>
-						<div className='flex space-x-1'>
-							<button
-								onClick={toggleMinimize}
-								className='text-white hover:bg-purple-700 rounded p-1'
-							>
-								{minimized ? "□" : "−"}
-							</button>
-						</div>
-					</div>
-					<div
-						className='relative'
-						style={{ height: minimized ? "calc(100% - 28px)" : "calc(100% - 28px)" }}
-					>
-						<VideoGrid minimized={minimized} />
-						<RoomAudioRenderer />
-						{!minimized && (
-							<div className='absolute bottom-0 left-0 right-0 bg-opacity-7'>
-								<ControlBar
-									variation='minimal'
-									className='w-full yellow-camera-controls'
-									controls={{ camera: true, microphone: true }}
-									style={{ width: "100%" } as React.CSSProperties}
-								/>
+				<div
+					ref={nodeRef as React.RefObject<HTMLDivElement>}
+					className={`fixed z-50 bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-200 ${
+						minimized ? "w-60 h-36" : "w-100 h-64"
+					}`}
+					style={{
+						boxShadow: "0 0 15px rgba(0,0,0,0.2)",
+						transition: "width 200ms ease, height 200ms ease, opacity 200ms ease",
+						transform: "translate3d(0,0,0)",
+						willChange: "transform, width, height",
+						touchAction: "none",
+						maxHeight: "calc(100vh - 100px)",
+						width: `${dimensions.width}px`,
+						height: `${dimensions.height}px`,
+
+						// when visible, use your x/y; when hidden, move it way off screen
+						// top left from what i have seen puts your panel wherever you left it before hiding
+						top: showVideoChat ? 0 : -10000,
+						left: showVideoChat ? 0 : -10000,
+
+						// hide it visually & disable events when “hidden”
+						opacity: showVideoChat ? 1 : 0,
+						pointerEvents: showVideoChat ? "auto" : "none",
+						// remove visibility:hidden entirely
+					}}
+				>
+					<RoomContext.Provider value={roomInstance}>
+						<div className='drag-handle flex items-center justify-between bg-purple-600 px-2 py-1 cursor-move text-white text-xs'>
+							<ConnectionStateUI />
+							<div className='flex space-x-1'>
+								{/* Add recording button here */}
+								<button
+									onClick={startRecording}
+									className='text-white hover:bg-red-700 rounded p-1'
+								>
+									{isRecording ? "■" : "●"}
+								</button>
 							</div>
-						)}
-					</div>
-				</RoomContext.Provider>
-			</div>
-		</Draggable>
+							<div className='flex space-x-1'>
+								<button
+									onClick={toggleMinimize}
+									className='text-white hover:bg-purple-700 rounded p-1'
+								>
+									{minimized ? "□" : "−"}
+								</button>
+							</div>
+						</div>
+						<div
+							className='relative'
+							style={{ height: minimized ? "calc(100% - 28px)" : "calc(100% - 28px)" }}
+						>
+							<VideoGrid minimized={minimized} />
+							<RoomAudioRenderer />
+							{!minimized && (
+								<div className='absolute bottom-0 left-0 right-0 bg-opacity-7'>
+									<ControlBar
+										variation='minimal'
+										className='w-full yellow-camera-controls'
+										controls={{ camera: true, microphone: true }}
+										style={{ width: "100%" } as React.CSSProperties}
+									/>
+								</div>
+							)}
+						</div>
+					</RoomContext.Provider>
+				</div>
+			</Draggable>
+
+			{/* Add file naming modal */}
+			<FileNamingModal
+				isOpen={showNamingModal}
+				onClose={() => {
+					setShowNamingModal(false);
+					setPendingRecording(null); // Discard recording if canceled
+				}}
+				onConfirm={(filename) => {
+					setShowNamingModal(false);
+					handleUploadWithCustomName(filename);
+				}}
+			/>
+		</>
 	);
 }
 

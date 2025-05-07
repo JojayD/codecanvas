@@ -35,7 +35,6 @@ export default function Dashboard() {
 		console.log("enableCamera changed:", enableCamera);
 	}, [enableAudio, enableCamera]);
 
-
 	const createNewRoom = async () => {
 		try {
 			setLoading(true);
@@ -142,7 +141,7 @@ export default function Dashboard() {
 							variant='outline'
 							className='bg-orange-500 text-white hover:bg-orange-700 mr-2'
 						>
-							Recordings
+							<Link href='/recordings'>Recordings</Link>
 						</Button>
 						<Button
 							onClick={() => setShowUpdates(!showUpdates)}
