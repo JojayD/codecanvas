@@ -1,3 +1,5 @@
+"use server"
+import 'dotenv/config';
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand, HeadBucketCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { supabase } from "@/lib/supabase";

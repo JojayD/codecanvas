@@ -1,3 +1,5 @@
+"use server"
+import 'dotenv/config';
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 export async function DELETE(request: NextRequest) {
