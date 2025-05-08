@@ -1,50 +1,49 @@
-"use server"
 import 'dotenv/config';
 import { NextRequest, NextResponse } from "next/server";
-  import { verifyS3Access } from "@/lib/s3";
-  import {ListObjectsV2Command, S3Client} from "@aws-sdk/client-s3";
-  import { log } from "console";
+import { verifyS3Access } from "@/lib/s3";
+import {ListObjectsV2Command, S3Client} from "@aws-sdk/client-s3";
+import { log } from "console";
 
 
-  async function listUserFiles(userId: string) {
-    const configuration = {
-      region: process.env.MYAPP_AWS_REGION || 'us-east-2',
-      credentials: {
-        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-      },
-    };
-    
-    if (process.env.DEVELOPMENT_MODE === 'true') {
-      configuration.credentials = {
-        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-      }
+async function listUserFiles(userId: string) {
+  const configuration = {
+    region: process.env.MYAPP_AWS_REGION || 'us-east-2',
+    credentials: {
+      accessKeyId: process.env.accessKeyId!,
+      secretAccessKey: process.env.secretAccessKey!,
+    },
+  };
+  
+  if (process.env.DEVELOPMENT_MODE === 'true') {
+    configuration.credentials = {
+      accessKeyId: process.env.accessKeyId!,
+      secretAccessKey: process.env.secretAccessKey!,
     }
-
-    const s3 = new S3Client(configuration);
-    const creds = await s3.config.credentials!();
-    console.log("Resolved creds:", {
-      accessKeyId: creds.accessKeyId,
-        secretAccessKey: creds.secretAccessKey ? "***" : undefined,
-        sessionToken: creds.sessionToken,
-      });
-    const command = new ListObjectsV2Command({
-      Bucket: 'code-canvas-recordings',
-      Prefix: `${userId}/`,
-      MaxKeys: 100
-    });
-
-    const response = await s3.send(command);
-    const files = response.Contents?.map((item) => ({
-      key: item.Key,
-      lastModified: item.LastModified,
-      size: item.Size,
-      name: item.Key?.split('/').pop()
-    })) || [];
-
-    return files;
   }
+
+  const s3 = new S3Client(configuration);
+  const creds = await s3.config.credentials!();
+  console.log("Resolved creds:", {
+    accessKeyId: creds.accessKeyId,
+      secretAccessKey: creds.secretAccessKey ? "***" : undefined,
+      sessionToken: creds.sessionToken,
+    });
+  const command = new ListObjectsV2Command({
+    Bucket: 'code-canvas-recordings',
+    Prefix: `${userId}/`,
+    MaxKeys: 100
+  });
+
+  const response = await s3.send(command);
+  const files = response.Contents?.map((item) => ({
+    key: item.Key,
+    lastModified: item.LastModified,
+    size: item.Size,
+    name: item.Key?.split('/').pop()
+  })) || [];
+
+  return files;
+}
 
 
   export async function GET(request: NextRequest) {
@@ -55,8 +54,8 @@ import { NextRequest, NextResponse } from "next/server";
     
     // Log first few characters of sensitive data (for debugging only)
     if (process.env.MYAPP_AWS_ACCESS_KEY_ID) {
-      const prefix = process.env.MYAPP_AWS_ACCESS_KEY_ID.substring(0, 4);
-      const length = process.env.MYAPP_AWS_ACCESS_KEY_ID.length;
+      const prefix = process.env.accessKeyId!.substring(0, 4);
+      const length = process.env.secretAccessKey!.length;
       console.log(`Access Key ID format: ${prefix}... (${length} chars)`);
     }
     await verifyS3Access();
