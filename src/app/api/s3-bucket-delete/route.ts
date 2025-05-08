@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 export async function DELETE(request: NextRequest) {
+  console.log("---------- DEBUGGING AWS CREDENTIALS ----------");
+  
+  // Check environment variables existence (not values)
+  console.log("Environment Variables Check:");
+  console.log("- AWS_REGION exists:", typeof process.env.MYAPP_AWS_REGION !== 'undefined');
+  console.log("- AWS_ACCESS_KEY_ID exists:", typeof process.env.MYAPP_AWS_ACCESS_KEY_ID !== 'undefined');
+  console.log("- AWS_SECRET_ACCESS_KEY exists:", typeof process.env.MYAPP_AWS_SECRET_ACCESS_KEY !== 'undefined');
+  
+  // Check for empty strings
+  console.log("Empty String Check:");
+  console.log("- AWS_REGION is empty:", process.env.MYAPP_AWS_REGION === '');
+  console.log("- AWS_ACCESS_KEY_ID is empty:", process.env.MYAPP_AWS_ACCESS_KEY_ID === '');
+  console.log("- AWS_SECRET_ACCESS_KEY is empty:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY === '');
+  
+  // Log actual region value (safe to log)
+  console.log("AWS Region:", process.env.MYAPP_AWS_REGION || 'us-east-2');
+  
+  // Log first few characters of sensitive data (for debugging only)
+  if (process.env.MYAPP_AWS_ACCESS_KEY_ID) {
+    const prefix = process.env.MYAPP_AWS_ACCESS_KEY_ID.substring(0, 4);
+    const length = process.env.MYAPP_AWS_ACCESS_KEY_ID.length;
+    console.log(`Access Key ID format: ${prefix}... (${length} chars)`);
+  }
   try {
     const { key, user_id } = await request.json();
     console.log("Delete request for key:", key);
