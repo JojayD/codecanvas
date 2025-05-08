@@ -7,24 +7,81 @@ import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { NextRequest, NextResponse } from 'next/server';
 import { log, error } from 'console';
 
+// Add a debug helper function
+export async function debugAwsCredentials() {
+  const envVars = {
+    NODE_ENV: process.env.NODE_ENV || 'undefined',
+    MYAPP_AWS_REGION: typeof process.env.MYAPP_AWS_REGION !== 'undefined' ? 
+      (process.env.MYAPP_AWS_REGION || '[empty string]') : 'undefined',
+    MYAPP_AWS_ACCESS_KEY_ID: typeof process.env.MYAPP_AWS_ACCESS_KEY_ID !== 'undefined' ? 
+      (process.env.MYAPP_AWS_ACCESS_KEY_ID ? `${process.env.MYAPP_AWS_ACCESS_KEY_ID.substring(0, 4)}...` : '[empty string]') : 'undefined',
+    MYAPP_AWS_SECRET_ACCESS_KEY: typeof process.env.MYAPP_AWS_SECRET_ACCESS_KEY !== 'undefined' ? 
+      (process.env.MYAPP_AWS_SECRET_ACCESS_KEY ? '[PRESENT]' : '[empty string]') : 'undefined',
+    DEVELOPMENT_MODE: typeof process.env.DEVELOPMENT_MODE !== 'undefined' ? 
+      process.env.DEVELOPMENT_MODE : 'undefined',
+  };
+
+  console.log('Environment variables debug info:', JSON.stringify(envVars, null, 2));
+  
+  try {
+    // Try to create an S3 client with minimal configuration
+    const testConfig = getS3Config();
+    
+    
+
+    const s3 = new S3Client(testConfig);
+ 
+    try {
+      const creds = await s3.config.credentials!();
+      console.log("AWS SDK resolved credentials successfully:", {
+        accessKeyId: creds.accessKeyId ? `${creds.accessKeyId.substring(0, 4)}...` : undefined,
+        secretAccessKeyExists: !!creds.secretAccessKey,
+        sessionTokenExists: !!creds.sessionToken,
+      });
+      return { success: true, message: "Credentials resolved successfully" };
+    } catch (credError: any) {
+      console.error("AWS SDK credential resolution failed:", credError.message);
+      return { 
+        success: false, 
+        message: `Credential resolution failed: ${credError.message}`,
+        error: credError
+      };
+    }
+  } catch (e: any) {
+    console.error("Failed to create test S3 client:", e.message);
+    return { success: false, message: `S3 client creation failed: ${e.message}`, error: e };
+  }
+}
+
+// Centralized function to get S3 configuration
+export async function getS3Config() {
+  // Default region
+  const region = process.env.MYAPP_AWS_REGION || 'us-east-2';
+  
+  // Check if we have the required credentials
+  const hasMainCredentials = !!process.env.MYAPP_AWS_ACCESS_KEY_ID && !!process.env.MYAPP_AWS_SECRET_ACCESS_KEY;
+  
+  // Base configuration
+  const config: any = { region };
+  
+  // Only add credentials if they exist
+  if (hasMainCredentials) {
+    config.credentials = {
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
+    };
+  } else {
+    console.warn("WARNING: Missing MYAPP_AWS_* credentials. AWS SDK will attempt to use default credential providers.");
+  }
+  
+  return config;
+}
 
 export async function presignUpload(key: string, contentType = 'video/webm') {
-  const configuration = {
-    region: process.env.MYAPP_AWS_REGION || 'us-east-2',
-    credentials: {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-    },
-  };
+  // First run diagnostics
+  await debugAwsCredentials();
   
-  if (process.env.DEVELOPMENT_MODE === 'true') {
-    configuration.credentials = {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-    }
-  }
-
-  const s3 = new S3Client(configuration);
+  const s3 = new S3Client(getS3Config());
 
   const command = new PutObjectCommand({
     Bucket: "code-canvas-recordings",
@@ -32,78 +89,56 @@ export async function presignUpload(key: string, contentType = 'video/webm') {
     ContentType: contentType,
   });
 
-  const signedUrl = await getSignedUrl(s3, command, {
-    expiresIn: 3600,
-  });
+  try {
+    const signedUrl = await getSignedUrl(s3, command, {
+      expiresIn: 3600,
+    });
 
-  log("Presigned URL:", signedUrl);
-  
-  return signedUrl;
+    log("Presigned URL:", signedUrl);
+    return signedUrl;
+  } catch (error: any) {
+    console.error("Error generating presigned URL:", error.message);
+    throw error;
+  }
 }
+
 export async function verifyS3Access() {
+  // First run diagnostics
+  const diagnostics = await debugAwsCredentials();
+  if (!diagnostics.success) {
+    console.error("AWS credential diagnostics failed:", diagnostics.message);
+  }
+
   try {
     console.log("---------- DEBUGGING AWS CREDENTIALS ----------");
     
     // Check environment variables existence (not values)
     console.log("Environment Variables Check:");
-    console.log("- AWS_REGION exists:", typeof process.env.MYAPP_AWS_REGION !== 'undefined');
-    console.log("- AWS_ACCESS_KEY_ID exists:", typeof process.env.MYAPP_AWS_ACCESS_KEY_ID !== 'undefined');
-    console.log("- AWS_SECRET_ACCESS_KEY exists:", typeof process.env.MYAPP_AWS_SECRET_ACCESS_KEY !== 'undefined');
+    console.log("- MYAPP_AWS_REGION exists:", typeof process.env.MYAPP_AWS_REGION !== 'undefined');
+    console.log("- MYAPP_AWS_ACCESS_KEY_ID exists:", typeof process.env.MYAPP_AWS_ACCESS_KEY_ID !== 'undefined');
+    console.log("- MYAPP_AWS_SECRET_ACCESS_KEY exists:", typeof process.env.MYAPP_AWS_SECRET_ACCESS_KEY !== 'undefined');
     
     // Development mode variables
     console.log("- DEVELOPMENT_MODE:", process.env.DEVELOPMENT_MODE);
-    console.log("- AWS_ACCESS_KEY exists:", typeof process.env.AWS_ACCESS_KEY !== 'undefined');
-    console.log("- AWS_SECRET_KEY exists:", typeof process.env.AWS_SECRET_KEY !== 'undefined');
     
     // Check for empty strings
     console.log("Empty String Check:");
-    console.log("- AWS_REGION is empty:", process.env.MYAPP_AWS_REGION === '');
-    console.log("- AWS_ACCESS_KEY_ID is empty:", process.env.MYAPP_AWS_ACCESS_KEY_ID === '');
-    console.log("- AWS_SECRET_ACCESS_KEY is empty:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY === '');
+    console.log("- MYAPP_AWS_REGION is empty:", process.env.MYAPP_AWS_REGION === '');
+    console.log("- MYAPP_AWS_ACCESS_KEY_ID is empty:", process.env.MYAPP_AWS_ACCESS_KEY_ID === '');
+    console.log("- MYAPP_AWS_SECRET_ACCESS_KEY is empty:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY === '');
     
-    if (process.env.DEVELOPMENT_MODE === 'true') {
-      console.log("- DEV AWS_ACCESS_KEY is empty:", process.env.AWS_ACCESS_KEY === '');
-      console.log("- DEV AWS_SECRET_KEY is empty:", process.env.AWS_SECRET_KEY === '');
-    }
-    
-    // Log actual region value (safe to log)
-    console.log("AWS Region:", process.env.MYAPP_AWS_REGION || 'us-east-2');
-    
-    // Log first few characters of sensitive data (for debugging only)
-    if (process.env.MYAPP_AWS_ACCESS_KEY_ID) {
-      const prefix = process.env.MYAPP_AWS_ACCESS_KEY_ID.substring(0, 5) + "..." || "MISSING";
-      console.log("  Access Key ID:", prefix);
-    }
-    console.log("  Secret Access Key:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY ? "[PRESENT]" : "MISSING");
-    
-    const configuration = {
-      region: 'us-east-2',
-      credentials: {
-        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-      },
-    };
-    
-    if (process.env.DEVELOPMENT_MODE === 'true') {
-      configuration.credentials = {
-        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-      }
-      console.log("Using development mode credentials");
-    }
-
-    const s3 = new S3Client(configuration);
+    const s3 = new S3Client(getS3Config());
     
     // Debug credentials to verify they're properly resolved
     try {
       const creds = await s3.config.credentials!();
-      console.log("Resolved S3 credentials:", {
+      console.log("Verify - Resolved S3 credentials:", {
         accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
         secretAccessKey: creds.secretAccessKey ? "***" : undefined,
         sessionToken: creds.sessionToken ? "Present" : "None",
       });
     } catch (error) {
-      console.error("Failed to resolve credentials:", error);
+      console.error("Failed to resolve credentials for verification:", error);
       return false;
     }
     
@@ -119,12 +154,12 @@ export async function verifyS3Access() {
       return true;
     } catch (bucketError: any) {
       console.error(`ERROR: Cannot access bucket '${bucketName}':`);
-      console.error(`Status: ${bucketError.name} (${bucketError.$metadata?.httpStatusCode})`);
-      console.error(`Message: ${bucketError.message}`);
+      console.error(`   Status: ${bucketError.name} (${bucketError.$metadata?.httpStatusCode})`);
+      console.error(`   Message: ${bucketError.message}`);
       return false;
     }
   } catch (e: any) {
-    console.error("ERROR: Failed to initialize S3 client:", e.message);
+    console.error(" ERROR: Failed to initialize S3 client:", e.message);
     return false;
   }
 }

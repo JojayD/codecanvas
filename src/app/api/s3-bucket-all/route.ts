@@ -1,8 +1,7 @@
 export const runtime = "nodejs";
-import 'dotenv/config';
 import { NextRequest, NextResponse } from "next/server";
-import { verifyS3Access } from "@/lib/s3";
-import {ListObjectsV2Command, S3Client} from "@aws-sdk/client-s3";
+import { verifyS3Access, getS3Config, debugAwsCredentials } from "@/lib/s3";
+import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { log } from "console";
 
 // Add OPTIONS handler for preflight requests
@@ -20,22 +19,10 @@ export async function OPTIONS() {
 }
 
 async function listUserFiles(userId: string) {
-  const configuration = {
-    region: process.env.MYAPP_AWS_REGION || 'us-east-2',
-    credentials: {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-    },
-  };
+  // Run diagnostics first
+  await debugAwsCredentials();
   
-  if (process.env.DEVELOPMENT_MODE === 'true') {
-    configuration.credentials = {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-    }
-  }
-
-  const s3 = new S3Client(configuration);
+  const s3 = new S3Client(getS3Config());
   
   // Debug credentials to verify they're properly resolved
   try {
@@ -66,19 +53,9 @@ async function listUserFiles(userId: string) {
   return files;
 }
 
-
 export async function GET(request: NextRequest) {
-
-  
-  // Log actual region value (safe to log)
-  console.log("AWS Region:", process.env.MYAPP_AWS_REGION || 'us-east-2');
-  
-  // Log first few characters of sensitive data (for debugging only)
-  if (process.env.MYAPP_AWS_ACCESS_KEY_ID) {
-    const prefix = process.env.MYAPP_AWS_ACCESS_KEY_ID.substring(0, 4);
-    const length = process.env.MYAPP_AWS_ACCESS_KEY_ID.length;
-    console.log(`Access Key ID format: ${prefix}... (${length} chars)`);
-  }
+  // Log env vars (safely)
+  await debugAwsCredentials();
   
   try {
     // Verify S3 access first (helps with debugging)
@@ -125,8 +102,8 @@ export async function GET(request: NextRequest) {
           'Access-Control-Expose-Headers': 'ETag'
         }
       }
-    )
-  } catch(error:any) {
+    );
+  } catch (error: any) {
     console.error("Error listing files:", error);
     return NextResponse.json(
       { error: error.message || "Failed to list files" },

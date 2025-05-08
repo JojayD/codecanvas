@@ -4,6 +4,7 @@ import { S3Client, PutObjectCommand, HeadBucketCommand, GetObjectCommand } from 
 import { supabase } from "@/lib/supabase";
 import { log } from "console";
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { getS3Config, debugAwsCredentials } from "@/lib/s3";
 
 // Add OPTIONS handler for preflight requests
 export async function OPTIONS() {
@@ -20,22 +21,7 @@ export async function OPTIONS() {
 }
 
 const presignDownload = async (key: string) => {
-   const configuration = {
-    region: process.env.MYAPP_AWS_REGION || 'us-east-2',
-    credentials: {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-    },
-  };
-  
-  if (process.env.DEVELOPMENT_MODE === 'true') {
-    configuration.credentials = {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-    }
-  }
-
-  const s3 = new S3Client(configuration);
+  const s3 = new S3Client(getS3Config());
   
   // Debug credentials
   try {
@@ -61,33 +47,14 @@ const presignDownload = async (key: string) => {
   return signedUrl;
 }
 
-
-
-
-
-async function presignUpload(key: string) {
-  const configuration = {
-    region: 'us-east-2',
-    credentials: {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-    },
-  };
-  
-  if (process.env.DEVELOPMENT_MODE === 'true') {
-    configuration.credentials = {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-    }
-  }
-
-  const s3 = new S3Client(configuration);
+const presignUpload = async (key: string, contentType = 'video/webm') => {
+  const s3 = new S3Client(getS3Config());
   
   // Debug credentials
   try {
     const creds = await s3.config.credentials!();
     console.log("Upload - Resolved S3 credentials:", {
-      accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined, 
+      accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
       secretAccessKey: creds.secretAccessKey ? "***" : undefined,
       sessionToken: creds.sessionToken ? "Present" : "None",
     });
@@ -98,72 +65,23 @@ async function presignUpload(key: string) {
   const command = new PutObjectCommand({
     Bucket: "code-canvas-recordings",
     Key: key,
-    ContentType: "video/webm",
+    ContentType: contentType,
   });
 
   const signedUrl = await getSignedUrl(s3, command, {
     expiresIn: 3600,
   });
 
-  log("Presigned URL:", signedUrl);
-  
   return signedUrl;
 }
 
 async function verifyS3Access() {
   try {
-    console.log("---------- DEBUGGING AWS CREDENTIALS ----------");
-    
-    // Check environment variables existence (not values)
-    console.log("Environment Variables Check:");
-    console.log("- AWS_REGION exists:", typeof process.env.MYAPP_AWS_REGION !== 'undefined');
-    console.log("- AWS_ACCESS_KEY_ID exists:", typeof process.env.MYAPP_AWS_ACCESS_KEY_ID !== 'undefined');
-    console.log("- AWS_SECRET_ACCESS_KEY exists:", typeof process.env.MYAPP_AWS_SECRET_ACCESS_KEY !== 'undefined');
-    
-    // Development mode variables
-    console.log("- DEVELOPMENT_MODE:", process.env.DEVELOPMENT_MODE);
-    console.log("- AWS_ACCESS_KEY exists:", typeof process.env.AWS_ACCESS_KEY !== 'undefined');
-    console.log("- AWS_SECRET_KEY exists:", typeof process.env.AWS_SECRET_KEY !== 'undefined');
-    
-    // Check for empty strings
-    console.log("Empty String Check:");
-    console.log("- AWS_REGION is empty:", process.env.MYAPP_AWS_REGION === '');
-    console.log("- AWS_ACCESS_KEY_ID is empty:", process.env.MYAPP_AWS_ACCESS_KEY_ID === '');
-    console.log("- AWS_SECRET_ACCESS_KEY is empty:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY === '');
-    
-    if (process.env.DEVELOPMENT_MODE === 'true') {
-      console.log("- DEV AWS_ACCESS_KEY is empty:", process.env.AWS_ACCESS_KEY === '');
-      console.log("- DEV AWS_SECRET_KEY is empty:", process.env.AWS_SECRET_KEY === '');
-    }
-    
-    // Log actual region value (safe to log)
-    console.log("AWS Region:", process.env.MYAPP_AWS_REGION || 'us-east-2');
-    
-    // Log first few characters of sensitive data (for debugging only)
-    if (process.env.MYAPP_AWS_ACCESS_KEY_ID) {
-      const prefix = process.env.MYAPP_AWS_ACCESS_KEY_ID.substring(0, 4);
-      const length = process.env.MYAPP_AWS_ACCESS_KEY_ID.length;
-      console.log(`Access Key ID format: ${prefix}... (${length} chars)`);
-    }
+    // Run diagnostic check first
+    await debugAwsCredentials();
     
     // Initialize the S3 client with appropriate credentials
-    const configuration = {
-      region: 'us-east-2',
-      credentials: {
-        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-      },
-    };
-    
-    if (process.env.DEVELOPMENT_MODE === 'true') {
-      configuration.credentials = {
-        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
-      }
-      console.log("Using development mode credentials");
-    }
-
-    const s3 = new S3Client(configuration);
+    const s3 = new S3Client(getS3Config());
     
     // Debug credentials to verify they're properly resolved
     try {
@@ -199,8 +117,6 @@ async function verifyS3Access() {
     return false;
   }
 }
-
-
 
 // Verify S3 access when the module is loaded
 
