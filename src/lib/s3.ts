@@ -8,10 +8,10 @@ import { log, error } from 'console';
 
 export async function presignUpload(key: string, contentType = 'video/webm') {
   const s3 = new S3Client({
-    region: process.env.AWS_REGION || 'us-east-2',
+    region: process.env.MYAPP_AWS_REGION || 'us-east-2',
     credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     },
     
   });
@@ -33,15 +33,15 @@ export async function presignUpload(key: string, contentType = 'video/webm') {
 export async function verifyS3Access() {
   try {
     console.log("Initializing S3 client with credentials:");
-    console.log("  Access Key ID:", process.env.AWS_ACCESS_KEY_ID?.substring(0, 5) + "..." || "MISSING");
-    console.log("  Secret Access Key:", process.env.AWS_SECRET_ACCESS_KEY ? "[PRESENT]" : "MISSING");
-    console.log("  Region:", process.env.AWS_REGION || "us-east-2");
+    console.log("  Access Key ID:", process.env.MYAPP_AWS_ACCESS_KEY_ID?.substring(0, 5) + "..." || "MISSING");
+    console.log("  Secret Access Key:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY ? "[PRESENT]" : "MISSING");
+    console.log("  Region:", process.env.MYAPP_AWS_REGION || "us-east-2");
     
     const s3 = new S3Client({
       region: 'us-east-2',
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
       },
     });
     
@@ -53,24 +53,17 @@ export async function verifyS3Access() {
     
     try {
       await s3.send(headBucketCommand);
-      console.log(`✅ SUCCESS: Bucket '${bucketName}' exists and is accessible.`);
+      console.log(`SUCCESS: Bucket '${bucketName}' exists and is accessible.`);
       return true;
     } catch (bucketError: any) {
-      console.error(`❌ ERROR: Cannot access bucket '${bucketName}':`);
-      console.error(`   Status: ${bucketError.name} (${bucketError.$metadata?.httpStatusCode})`);
-      console.error(`   Message: ${bucketError.message}`);
+      console.error(`ERROR: Cannot access bucket '${bucketName}':`);
+      console.error(`Status: ${bucketError.name} (${bucketError.$metadata?.httpStatusCode})`);
+      console.error(`Message: ${bucketError.message}`);
       return false;
     }
   } catch (e: any) {
-    console.error("❌ ERROR: Failed to initialize S3 client:", e.message);
+    console.error("ERROR: Failed to initialize S3 client:", e.message);
     return false;
   }
 }
 
-// export async function presignDownload(key: string) {
-//   const command = new GetObjectCommand({
-//     Bucket: process.env.AWS_S3_BUCKET!,
-//     Key: key,
-//   });
-//   return getSignedUrl(s3, command, { expiresIn: +process.env.S3_PRESIGN_EXPIRY! });
-// }
