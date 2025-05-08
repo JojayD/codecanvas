@@ -5,11 +5,7 @@ import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { NextRequest, NextResponse } from 'next/server';
 import { log, error } from 'console';
 
-// Helper to create an S3 client with default credential provider chain
-export function createS3Client() {
-  const region = process.env.MYAPP_AWS_REGION || process.env.AWS_REGION || 'us-east-2';
-  return new S3Client({ region });
-}
+
 
 // Add a debug helper function
 export async function debugAwsCredentials() {
@@ -24,7 +20,13 @@ export async function debugAwsCredentials() {
   console.log('Environment variables debug info:', JSON.stringify(envVars, null, 2));
   
   try {
-    const s3 = createS3Client();
+    const s3 = new S3Client({
+      region: process.env.MYAPP_AWS_REGION || 'us-east-2',
+      credentials: {
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
+      }
+    });
     console.log("S3 client created with region:", s3.config.region);
     return { success: true, message: "S3 client created successfully" };
   } catch (e: any) {
@@ -34,7 +36,13 @@ export async function debugAwsCredentials() {
 }
 
 export async function presignUpload(key: string, contentType = 'video/webm') {
-  const s3 = createS3Client();
+  const s3 = new S3Client({
+    region: process.env.MYAPP_AWS_REGION || 'us-east-2',
+    credentials: {
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
+    }
+  });
   const bucketName = process.env.S3_BUCKET_NAME || "code-canvas-recordings";
   
   const command = new PutObjectCommand({
@@ -65,7 +73,13 @@ export async function verifyS3Access() {
     console.log("- MYAPP_AWS_REGION exists:", typeof process.env.MYAPP_AWS_REGION !== 'undefined');
     console.log("- S3_BUCKET_NAME exists:", typeof process.env.S3_BUCKET_NAME !== 'undefined');
     
-    const s3 = createS3Client();
+    const s3 = new S3Client({
+      region: process.env.MYAPP_AWS_REGION || 'us-east-2',
+      credentials: {
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
+      }
+    });
     console.log("S3 client created for region:", s3.config.region);
     
     // Check if bucket exists

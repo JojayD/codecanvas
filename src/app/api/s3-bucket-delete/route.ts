@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { verifyS3Access, debugAwsCredentials, createS3Client } from "@/lib/s3";
+import { verifyS3Access, debugAwsCredentials } from "@/lib/s3";
 
 // Add OPTIONS handler for preflight requests
 export async function OPTIONS() {
@@ -65,7 +65,13 @@ export async function DELETE(request: NextRequest) {
     }
     
     // Create a new S3 client using default credential provider chain
-    const s3 = createS3Client();
+    const s3 = new S3Client({
+      region: process.env.MYAPP_AWS_REGION || 'us-east-2',
+      credentials: {
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
+      }
+    });
     console.log("S3 client created");
     
     console.log("Proceeding with deletion for key:", key);
