@@ -5,24 +5,49 @@ import { supabase } from "@/lib/supabase";
 import { log } from "console";
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+// Add OPTIONS handler for preflight requests
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    headers: {
+      'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:3000' 
+        : 'https://codecanvas.digital',
+      'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, x-amz-content-sha256, x-amz-date, Authorization, x-amz-security-token',
+      'Access-Control-Max-Age': '3000'
+    }
+  });
+}
 
 const presignDownload = async (key: string) => {
    const configuration = {
     region: process.env.MYAPP_AWS_REGION || 'us-east-2',
     credentials: {
-      accessKeyId: process.env.accessKeyId!,
-      secretAccessKey: process.env.secretAccessKey!,
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     },
   };
   
   if (process.env.DEVELOPMENT_MODE === 'true') {
     configuration.credentials = {
-      accessKeyId: process.env.accessKeyId!,
-      secretAccessKey: process.env.secretAccessKey!,
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     }
   }
 
   const s3 = new S3Client(configuration);
+  
+  // Debug credentials
+  try {
+    const creds = await s3.config.credentials!();
+    console.log("Download - Resolved S3 credentials:", {
+      accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
+      secretAccessKey: creds.secretAccessKey ? "***" : undefined,
+      sessionToken: creds.sessionToken ? "Present" : "None",
+    });
+  } catch (error) {
+    console.error("Failed to resolve credentials for download:", error);
+  }
 
   const command = new GetObjectCommand({
     Bucket: "code-canvas-recordings",
@@ -51,12 +76,24 @@ async function presignUpload(key: string) {
   
   if (process.env.DEVELOPMENT_MODE === 'true') {
     configuration.credentials = {
-      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY!,
-      secretAccessKey: process.env.MYAPP_AWS_SECRET_KEY!,
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     }
   }
 
   const s3 = new S3Client(configuration);
+  
+  // Debug credentials
+  try {
+    const creds = await s3.config.credentials!();
+    console.log("Upload - Resolved S3 credentials:", {
+      accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined, 
+      secretAccessKey: creds.secretAccessKey ? "***" : undefined,
+      sessionToken: creds.sessionToken ? "Present" : "None",
+    });
+  } catch (error) {
+    console.error("Failed to resolve credentials for upload:", error);
+  }
 
   const command = new PutObjectCommand({
     Bucket: "code-canvas-recordings",
@@ -75,30 +112,71 @@ async function presignUpload(key: string) {
 
 async function verifyS3Access() {
   try {
-
-  
-  // Log first few characters of sensitive data (for debugging only)
-  if (process.env.accessKeyId) {
-    const prefix = process.env.accessKeyId!.substring(0, 4);
-    const length = process.env.accessKeyId!.length;
-    console.log(`Access Key ID format: ${prefix}... (${length} chars)`);
-  }
+    console.log("---------- DEBUGGING AWS CREDENTIALS ----------");
+    
+    // Check environment variables existence (not values)
+    console.log("Environment Variables Check:");
+    console.log("- AWS_REGION exists:", typeof process.env.MYAPP_AWS_REGION !== 'undefined');
+    console.log("- AWS_ACCESS_KEY_ID exists:", typeof process.env.MYAPP_AWS_ACCESS_KEY_ID !== 'undefined');
+    console.log("- AWS_SECRET_ACCESS_KEY exists:", typeof process.env.MYAPP_AWS_SECRET_ACCESS_KEY !== 'undefined');
+    
+    // Development mode variables
+    console.log("- DEVELOPMENT_MODE:", process.env.DEVELOPMENT_MODE);
+    console.log("- AWS_ACCESS_KEY exists:", typeof process.env.AWS_ACCESS_KEY !== 'undefined');
+    console.log("- AWS_SECRET_KEY exists:", typeof process.env.AWS_SECRET_KEY !== 'undefined');
+    
+    // Check for empty strings
+    console.log("Empty String Check:");
+    console.log("- AWS_REGION is empty:", process.env.MYAPP_AWS_REGION === '');
+    console.log("- AWS_ACCESS_KEY_ID is empty:", process.env.MYAPP_AWS_ACCESS_KEY_ID === '');
+    console.log("- AWS_SECRET_ACCESS_KEY is empty:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY === '');
+    
+    if (process.env.DEVELOPMENT_MODE === 'true') {
+      console.log("- DEV AWS_ACCESS_KEY is empty:", process.env.AWS_ACCESS_KEY === '');
+      console.log("- DEV AWS_SECRET_KEY is empty:", process.env.AWS_SECRET_KEY === '');
+    }
+    
+    // Log actual region value (safe to log)
+    console.log("AWS Region:", process.env.MYAPP_AWS_REGION || 'us-east-2');
+    
+    // Log first few characters of sensitive data (for debugging only)
+    if (process.env.MYAPP_AWS_ACCESS_KEY_ID) {
+      const prefix = process.env.MYAPP_AWS_ACCESS_KEY_ID.substring(0, 4);
+      const length = process.env.MYAPP_AWS_ACCESS_KEY_ID.length;
+      console.log(`Access Key ID format: ${prefix}... (${length} chars)`);
+    }
+    
+    // Initialize the S3 client with appropriate credentials
     const configuration = {
       region: 'us-east-2',
       credentials: {
-        accessKeyId: process.env.accessKeyId!,
-        secretAccessKey: process.env.secretAccessKey!,
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
       },
     };
     
     if (process.env.DEVELOPMENT_MODE === 'true') {
       configuration.credentials = {
-        accessKeyId: process.env.accessKeyId!,
-        secretAccessKey: process.env.secretAccessKey!,
+        accessKeyId: process.env.AWS_ACCESS_KEY!,
+        secretAccessKey: process.env.AWS_SECRET_KEY!,
       }
+      console.log("Using development mode credentials");
     }
 
     const s3 = new S3Client(configuration);
+    
+    // Debug credentials to verify they're properly resolved
+    try {
+      const creds = await s3.config.credentials!();
+      console.log("Verify - Resolved S3 credentials:", {
+        accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
+        secretAccessKey: creds.secretAccessKey ? "***" : undefined,
+        sessionToken: creds.sessionToken ? "Present" : "None",
+      });
+    } catch (error) {
+      console.error("Failed to resolve credentials for verification:", error);
+      return false;
+    }
     
     // Check if bucket exists
     const bucketName = "code-canvas-recordings";
@@ -131,14 +209,35 @@ export async function POST(request: NextRequest) {
   
   try {
     // Verify S3 access first - this helps debug permission issues
-    await verifyS3Access();
+    const accessVerified = await verifyS3Access();
+    if (!accessVerified) {
+      console.error("S3 access verification failed");
+      return NextResponse.json(
+        { error: "Failed to access S3 bucket" },
+        { 
+          status: 500,
+          headers: {
+            'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+              ? 'http://localhost:3000' 
+              : 'https://codecanvas.digital'
+          }
+        }
+      );
+    }
     
     const { fileName, userId } = await request.json();
   
     if (!fileName) {
       return NextResponse.json(
         { error: "Missing fileName" },
-        { status: 400 }
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+              ? 'http://localhost:3000' 
+              : 'https://codecanvas.digital'
+          }
+        }
       );
     }
     
@@ -157,9 +256,12 @@ export async function POST(request: NextRequest) {
       { url: presignedUrl },
       {
         headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+          'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:3000' 
+            : 'https://codecanvas.digital',
+          'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, x-amz-content-sha256, x-amz-date, Authorization, x-amz-security-token',
+          'Access-Control-Expose-Headers': 'ETag'
         }
       }
     );
@@ -167,35 +269,96 @@ export async function POST(request: NextRequest) {
     console.error("Error generating presigned URL:", error);
     return NextResponse.json(
       { error: error.message || "Failed to generate presigned URL" },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:3000' 
+            : 'https://codecanvas.digital'
+        }
+      }
     );
   }
 }
 
 export async function GET(request: NextRequest) {
-  await verifyS3Access();
-  log("GET request received for presigned URL");
-  try{
-      const { searchParams } = new URL(request.url);
-      const fileName = searchParams.get('key');
-      const userId = searchParams.get('userId');
-      log("User ID from s3-bucket", userId);
-      if (!fileName) {
-        return NextResponse.json(
-          { error: "fileName is required" },
-          { status: 400 }
-        );
-      }
-      const downloadUrl = await presignDownload(fileName);
-      return NextResponse.redirect(downloadUrl);
-      
-      
-  }catch(error:any){
-      console.error("Error generating presigned URL:", error);
+  try {
+    // Verify S3 access first (helps with debugging)
+    const accessVerified = await verifyS3Access();
+    if (!accessVerified) {
+      console.error("S3 access verification failed");
       return NextResponse.json(
-        { error: error.message || "Failed to generate presigned URL" },
-        { status: 500 }
+        { error: "Failed to access S3 bucket" },
+        { 
+          status: 500,
+          headers: {
+            'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+              ? 'http://localhost:3000' 
+              : 'https://codecanvas.digital'
+          }
+        }
       );
+    }
+    
+    log("GET request received for presigned URL");
+    
+    const { searchParams } = new URL(request.url);
+    const fileName = searchParams.get('key');
+    const userId = searchParams.get('userId');
+    log("User ID from s3-bucket", userId);
+    
+    if (!fileName) {
+      return NextResponse.json(
+        { error: "fileName is required" },
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+              ? 'http://localhost:3000' 
+              : 'https://codecanvas.digital'
+          }
+        }
+      );
+    }
+    
+    try {
+      const downloadUrl = await presignDownload(fileName);
+      const response = NextResponse.redirect(downloadUrl);
+      
+      // Add CORS headers to redirect
+      response.headers.set(
+        'Access-Control-Allow-Origin', 
+        process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://codecanvas.digital'
+      );
+      
+      return response;
+    } catch (presignError: any) {
+      console.error("Error generating download URL:", presignError);
+      return NextResponse.json(
+        { error: presignError.message || "Failed to generate download URL" },
+        { 
+          status: 500,
+          headers: {
+            'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+              ? 'http://localhost:3000' 
+              : 'https://codecanvas.digital'
+          }
+        }
+      );
+    }
+  } catch(error:any) {
+    console.error("Error processing download request:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to process download request" },
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:3000' 
+            : 'https://codecanvas.digital'
+        }
+      }
+    );
   }
 }
 
