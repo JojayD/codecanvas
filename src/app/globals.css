@@ -87,6 +87,15 @@ body {
 	--sidebar-accent-foreground: oklch(0.205 0 0);
 	--sidebar-border: oklch(0.922 0 0);
 	--sidebar-ring: oklch(0.708 0 0);
+
+	/* Purple color palette */
+	--purple-light: #d8b4fe; /* Light purple */
+	--purple-main: #9333ea; /* Medium purple */
+	--purple-dark: #6b21a8; /* Dark purple */
+	--gold: #fbbf24; /* Gold - complements purple */
+	--teal: #2dd4bf; /* Teal - contrasts nicely with purple */
+	--lavender: #e9d5ff; /* Light lavender */
+	--magenta: #db2777; /* Magenta - analogous to purple */
 }
 
 .dark {
@@ -196,14 +205,14 @@ body {
 }
 
 .yellow-camera-controls button {
-	color: yellow !important;
-	fill: yellow !important;
-	stroke: yellow !important;
+	color: rgb(188, 188, 64) !important;
+	fill: rgb(188, 188, 64) !important;
+	stroke: rgb(188, 188, 64) !important;
 }
 .yellow-camera-controls svg {
-	color: yellow !important;
-	fill: yellow !important;
-	stroke: yellow !important;
+	color: rgb(188, 188, 64) !important;
+	fill: rgb(188, 188, 64) !important;
+	stroke: rgb(188, 188, 64) !important;
 }
 
 .custom-layout {
