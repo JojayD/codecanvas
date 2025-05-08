@@ -5,6 +5,9 @@ const nextConfig = {
 		DEPLOY_ENV: process.env.NODE_ENV || 'development',
 		SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || '',
 		REDIRECT_URL: process.env.NEXT_PUBLIC_REDIRECT_URL || '',
+		MYAPP_AWS_REGION: process.env.MYAPP_AWS_REGION || 'us-east-2',
+		MYAPP_AWS_ACCESS_KEY_ID: process.env.MYAPP_AWS_ACCESS_KEY_ID || '',
+		MYAPP_AWS_SECRET_ACCESS_KEY: process.env.MYAPP_AWS_SECRET_ACCESS_KEY || '',
 	},
 	
 	// 1) Add the removeConsole compiler option:
