@@ -16,6 +16,7 @@
 		"@aws-amplify/ui-react": "^6.9.4",
 		"@aws-sdk/client-dynamodb": "^3.767.0",
 		"@aws-sdk/lib-dynamodb": "^3.767.0",
+		"@aws-sdk/s3-request-presigner": "^3.800.0",
 		"@livekit/components-react": "^2.9.3",
 		"@livekit/components-styles": "^1.1.5",
 		"@monaco-editor/react": "^4.7.0",
@@ -50,6 +51,7 @@
 		"react-konva": "^19.0.3",
 		"react-resizable-panels": "^2.1.7",
 		"react-typed": "^2.0.12",
+		"recordrtc": "^5.6.2",
 		"tailwind-merge": "^3.0.2",
 		"tailwindcss-animate": "^1.0.7",
 		"uuid": "^11.1.0"
