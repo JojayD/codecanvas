@@ -116,8 +116,8 @@ export async function DELETE(request: NextRequest) {
     
     if (process.env.DEVELOPMENT_MODE === 'true') {
       configuration.credentials = {
-        accessKeyId: process.env.AWS_ACCESS_KEY!,
-        secretAccessKey: process.env.AWS_SECRET_KEY!,
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
       }
     }
 
