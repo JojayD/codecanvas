@@ -15,34 +15,29 @@ export async function DELETE(request: NextRequest) {
     console.log("Authenticated user ID:", user_id);
     
  
-
-    // Modified security check - allow deletion if:
-    // 1. The key starts with the user's ID (standard format)
-    // 2. OR the key is listed in the user's accessible files
+    // Check if the key starts with the user's ID
+  
     if (!key.startsWith(`${user_id}/`)) {
       console.log("Key doesn't start with user ID, checking if user has access rights");
       
-      // Initialize S3 client for listing user files
       const s3 = new S3Client({
-        region: process.env.AWS_REGION || 'us-east-2',
+        region: process.env.MYAPP_AWS_REGION || 'us-east-2',
         credentials: {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
         },
       });
       
-      // Optional: You could add additional checks here to verify the user's access rights
-      // For now, we'll just proceed with the deletion assuming frontend validation is sufficient
       
       console.log("Proceeding with deletion for key:", key);
     }
     
     // Initialize S3 client
     const s3 = new S3Client({
-      region: process.env.AWS_REGION || 'us-east-2',
+      region: process.env.MYAPP_AWS_REGION || 'us-east-2',
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
       },
     });
     
@@ -52,7 +47,6 @@ export async function DELETE(request: NextRequest) {
       Key: key
     });
     
-    // Execute delete operation
     await s3.send(deleteCommand);
     console.log("Successfully deleted recording:", key);
     

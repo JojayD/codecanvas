@@ -7,10 +7,10 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const presignDownload = async (key: string) => {
    const s3 = new S3Client({
-    region: process.env.AWS_REGION || 'us-east-2',
+    region: process.env.MYAPP_AWS_REGION || 'us-east-2',
     credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     },
   });
 
@@ -34,8 +34,8 @@ async function presignUpload(key: string) {
   const s3 = new S3Client({
     region: 'us-east-2',
     credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     },
     
   });
@@ -61,8 +61,8 @@ async function verifyS3Access() {
     const s3 = new S3Client({
       region: 'us-east-2',
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
       },
     });
     
@@ -74,16 +74,16 @@ async function verifyS3Access() {
     
     try {
       await s3.send(headBucketCommand);
-      console.log(`✅ SUCCESS: Bucket '${bucketName}' exists and is accessible.`);
+      console.log(`SUCCESS: Bucket '${bucketName}' exists and is accessible.`);
       return true;
     } catch (bucketError: any) {
-      console.error(`❌ ERROR: Cannot access bucket '${bucketName}':`);
+      console.error(`ERROR: Cannot access bucket '${bucketName}':`);
       console.error(`   Status: ${bucketError.name} (${bucketError.$metadata?.httpStatusCode})`);
       console.error(`   Message: ${bucketError.message}`);
       return false;
     }
   } catch (e: any) {
-    console.error("❌ ERROR: Failed to initialize S3 client:", e.message);
+    console.error(" ERROR: Failed to initialize S3 client:", e.message);
     return false;
   }
 }
