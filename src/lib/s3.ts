@@ -7,14 +7,22 @@ import { log, error } from 'console';
 
 
 export async function presignUpload(key: string, contentType = 'video/webm') {
-  const s3 = new S3Client({
+  const configuration = {
     region: process.env.MYAPP_AWS_REGION || 'us-east-2',
     credentials: {
       accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
       secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     },
-    
-  });
+  };
+  
+  if (process.env.DEVELOPMENT_MODE === 'true') {
+    configuration.credentials = {
+      accessKeyId: process.env.AWS_ACCESS_KEY!,
+      secretAccessKey: process.env.AWS_SECRET_KEY!,
+    }
+  }
+
+  const s3 = new S3Client(configuration);
 
   const command = new PutObjectCommand({
     Bucket: "code-canvas-recordings",
@@ -37,13 +45,22 @@ export async function verifyS3Access() {
     console.log("  Secret Access Key:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY ? "[PRESENT]" : "MISSING");
     console.log("  Region:", process.env.MYAPP_AWS_REGION || "us-east-2");
     
-    const s3 = new S3Client({
+    const configuration = {
       region: 'us-east-2',
       credentials: {
         accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
         secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
       },
-    });
+    };
+    
+    if (process.env.DEVELOPMENT_MODE === 'true') {
+      configuration.credentials = {
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_KEY!,
+      }
+    }
+
+    const s3 = new S3Client(configuration);
     
     // Check if bucket exists
     const bucketName = "code-canvas-recordings";

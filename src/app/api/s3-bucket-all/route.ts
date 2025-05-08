@@ -5,13 +5,23 @@ import { log } from "console";
 
 
  async function listUserFiles(userId: string) {
-  const s3 = new S3Client({
+  const configuration = {
     region: process.env.MYAPP_AWS_REGION || 'us-east-2',
     credentials: {
       accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
       secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     },
-  });
+  };
+  
+  if (process.env.DEVELOPMENT_MODE === 'true') {
+    configuration.credentials = {
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
+    }
+  }
+
+  const s3 = new S3Client(configuration);
+  
   const command = new ListObjectsV2Command({
     Bucket: 'code-canvas-recordings',
     Prefix: `${userId}/`,
@@ -31,19 +41,7 @@ import { log } from "console";
 
 
 export async function GET(request: NextRequest) {
-  console.log("---------- DEBUGGING AWS CREDENTIALS ----------");
-  
-  // Check environment variables existence (not values)
-  console.log("Environment Variables Check:");
-  console.log("- AWS_REGION exists:", typeof process.env.MYAPP_AWS_REGION !== 'undefined');
-  console.log("- AWS_ACCESS_KEY_ID exists:", typeof process.env.MYAPP_AWS_ACCESS_KEY_ID !== 'undefined');
-  console.log("- AWS_SECRET_ACCESS_KEY exists:", typeof process.env.MYAPP_AWS_SECRET_ACCESS_KEY !== 'undefined');
-  
-  // Check for empty strings
-  console.log("Empty String Check:");
-  console.log("- AWS_REGION is empty:", process.env.MYAPP_AWS_REGION === '');
-  console.log("- AWS_ACCESS_KEY_ID is empty:", process.env.MYAPP_AWS_ACCESS_KEY_ID === '');
-  console.log("- AWS_SECRET_ACCESS_KEY is empty:", process.env.MYAPP_AWS_SECRET_ACCESS_KEY === '');
+
   
   // Log actual region value (safe to log)
   console.log("AWS Region:", process.env.MYAPP_AWS_REGION || 'us-east-2');

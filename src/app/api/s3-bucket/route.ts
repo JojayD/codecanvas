@@ -6,13 +6,22 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 
 const presignDownload = async (key: string) => {
-   const s3 = new S3Client({
+   const configuration = {
     region: process.env.MYAPP_AWS_REGION || 'us-east-2',
     credentials: {
       accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
       secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     },
-  });
+  };
+  
+  if (process.env.DEVELOPMENT_MODE === 'true') {
+    configuration.credentials = {
+      accessKeyId: process.env.AWS_ACCESS_KEY!,
+      secretAccessKey: process.env.AWS_SECRET_KEY!,
+    }
+  }
+
+  const s3 = new S3Client(configuration);
 
   const command = new GetObjectCommand({
     Bucket: "code-canvas-recordings",
@@ -31,14 +40,22 @@ const presignDownload = async (key: string) => {
 
 
 async function presignUpload(key: string) {
-  const s3 = new S3Client({
+  const configuration = {
     region: 'us-east-2',
     credentials: {
       accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
       secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
     },
-    
-  });
+  };
+  
+  if (process.env.DEVELOPMENT_MODE === 'true') {
+    configuration.credentials = {
+      accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY!,
+      secretAccessKey: process.env.MYAPP_AWS_SECRET_KEY!,
+    }
+  }
+
+  const s3 = new S3Client(configuration);
 
   const command = new PutObjectCommand({
     Bucket: "code-canvas-recordings",
@@ -80,13 +97,22 @@ async function verifyS3Access() {
     const length = process.env.MYAPP_AWS_ACCESS_KEY_ID.length;
     console.log(`Access Key ID format: ${prefix}... (${length} chars)`);
   }
-    const s3 = new S3Client({
+    const configuration = {
       region: 'us-east-2',
       credentials: {
         accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
         secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
       },
-    });
+    };
+    
+    if (process.env.DEVELOPMENT_MODE === 'true') {
+      configuration.credentials = {
+        accessKeyId: process.env.AWS_ACCESS_KEY!,
+        secretAccessKey: process.env.AWS_SECRET_KEY!,
+      }
+    }
+
+    const s3 = new S3Client(configuration);
     
     // Check if bucket exists
     const bucketName = "code-canvas-recordings";

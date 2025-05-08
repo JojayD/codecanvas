@@ -43,26 +43,44 @@ export async function DELETE(request: NextRequest) {
     if (!key.startsWith(`${user_id}/`)) {
       console.log("Key doesn't start with user ID, checking if user has access rights");
       
-      const s3 = new S3Client({
+      const configuration = {
         region: process.env.MYAPP_AWS_REGION || 'us-east-2',
         credentials: {
           accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
           secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
         },
-      });
+      };
+      
+      if (process.env.DEVELOPMENT_MODE === 'true') {
+        configuration.credentials = {
+          accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY!,
+          secretAccessKey: process.env.MYAPP_AWS_SECRET_KEY!,
+        }
+      }
+
+      const s3 = new S3Client(configuration);
       
       
       console.log("Proceeding with deletion for key:", key);
     }
     
     // Initialize S3 client
-    const s3 = new S3Client({
+    const configuration = {
       region: process.env.MYAPP_AWS_REGION || 'us-east-2',
       credentials: {
         accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY_ID!,
         secretAccessKey: process.env.MYAPP_AWS_SECRET_ACCESS_KEY!,
       },
-    });
+    };
+    
+    if (process.env.DEVELOPMENT_MODE === 'true') {
+      configuration.credentials = {
+        accessKeyId: process.env.MYAPP_AWS_ACCESS_KEY!,
+        secretAccessKey: process.env.MYAPP_AWS_SECRET_KEY!,
+      }
+    }
+
+    const s3 = new S3Client(configuration);
     
     // Create delete command
     const deleteCommand = new DeleteObjectCommand({
