@@ -57,10 +57,6 @@ export async function presignUpload(key: string) {
 
 export async function verifyS3Access() {
   try {
-    console.log("Initializing S3 client with credentials:");
-    console.log("  Access Key ID:", process.env.AWS_ACCESS_KEY_ID?.substring(0, 5) + "..." || "MISSING");
-    console.log("  Secret Access Key:", process.env.AWS_SECRET_ACCESS_KEY ? "[PRESENT]" : "MISSING");
-    console.log("  Region:", process.env.AWS_REGION || "us-east-2");
     
     const s3 = new S3Client({
       region: 'us-east-2',

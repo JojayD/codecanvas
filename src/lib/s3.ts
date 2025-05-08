@@ -30,7 +30,6 @@ export async function presignUpload(key: string, contentType = 'video/webm') {
   
   return signedUrl;
 }
-
 export async function verifyS3Access() {
   try {
     console.log("Initializing S3 client with credentials:");
