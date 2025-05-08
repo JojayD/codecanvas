@@ -68,9 +68,9 @@ export async function DELETE(request: NextRequest) {
     const s3 = new S3Client(getS3Config());
     
     console.log("Proceeding with deletion for key:", key);
-    
+    const BUCKET = process.env.S3_BUCKET_NAME!;
     const command = new DeleteObjectCommand({
-      Bucket: "code-canvas-recordings",
+      Bucket: BUCKET,
       Key: key,
     });
     

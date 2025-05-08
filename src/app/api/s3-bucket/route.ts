@@ -34,9 +34,9 @@ const presignDownload = async (key: string) => {
   } catch (error) {
     console.error("Failed to resolve credentials for download:", error);
   }
-
+  const BUCKET = process.env.S3_BUCKET_NAME!;
   const command = new GetObjectCommand({
-    Bucket: "code-canvas-recordings",
+    Bucket: BUCKET,
     Key: key,
   });
 
@@ -61,9 +61,9 @@ const presignUpload = async (key: string, contentType = 'video/webm') => {
   } catch (error) {
     console.error("Failed to resolve credentials for upload:", error);
   }
-
+  const BUCKET = process.env.S3_BUCKET_NAME!;
   const command = new PutObjectCommand({
-    Bucket: "code-canvas-recordings",
+    Bucket: BUCKET,
     Key: key,
     ContentType: contentType,
   });

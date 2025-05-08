@@ -82,9 +82,9 @@ export async function presignUpload(key: string, contentType = 'video/webm') {
   await debugAwsCredentials();
   
   const s3 = new S3Client(getS3Config());
-
+  const BUCKET = process.env.S3_BUCKET_NAME!;
   const command = new PutObjectCommand({
-    Bucket: "code-canvas-recordings",
+    Bucket: BUCKET,
     Key: key,
     ContentType: contentType,
   });

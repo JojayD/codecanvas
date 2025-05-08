@@ -35,9 +35,9 @@ async function listUserFiles(userId: string) {
   } catch (error) {
     console.error("Failed to resolve credentials:", error);
   }
-  
+  const BUCKET = process.env.S3_BUCKET_NAME!;
   const command = new ListObjectsV2Command({
-    Bucket: 'code-canvas-recordings',
+    Bucket: BUCKET,
     Prefix: `${userId}/`,
     MaxKeys: 100
   });
