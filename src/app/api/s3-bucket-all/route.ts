@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import 'dotenv/config';
 import { NextRequest, NextResponse } from "next/server";
 import { verifyS3Access } from "@/lib/s3";
