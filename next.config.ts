@@ -13,7 +13,7 @@ const nextConfig = {
 	// 1) Add the removeConsole compiler option:
 	compiler: {
 		// Only remove console.* in production builds
-		// removeConsole: process.env.NODE_ENV === "production",
+		removeConsole: process.env.NODE_ENV === "production",
 	},
 
 	webpack: (config: any, { isServer }: { isServer: boolean }) => {
