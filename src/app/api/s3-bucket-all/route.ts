@@ -4,7 +4,7 @@ import {ListObjectsV2Command, S3Client} from "@aws-sdk/client-s3";
 import { log } from "console";
 
 
-export async function listUserFiles(userId: string) {
+ async function listUserFiles(userId: string) {
   const s3 = new S3Client({
     region: process.env.AWS_REGION || 'us-east-2',
     credentials: {

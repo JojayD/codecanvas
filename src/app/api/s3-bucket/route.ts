@@ -5,7 +5,7 @@ import { log } from "console";
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 
-export const presignDownload = async (key: string) => {
+const presignDownload = async (key: string) => {
    const s3 = new S3Client({
     region: process.env.AWS_REGION || 'us-east-2',
     credentials: {
@@ -30,7 +30,7 @@ export const presignDownload = async (key: string) => {
 
 
 
-export async function presignUpload(key: string) {
+async function presignUpload(key: string) {
   const s3 = new S3Client({
     region: 'us-east-2',
     credentials: {
@@ -55,7 +55,7 @@ export async function presignUpload(key: string) {
   return signedUrl;
 }
 
-export async function verifyS3Access() {
+async function verifyS3Access() {
   try {
     
     const s3 = new S3Client({
