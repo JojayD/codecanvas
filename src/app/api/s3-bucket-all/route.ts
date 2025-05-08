@@ -1,8 +1,10 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyS3Access, getS3Config, debugAwsCredentials } from "@/lib/s3";
-import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
+import { verifyS3Access, debugAwsCredentials } from "@/lib/s3";
+import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { log } from "console";
+import { S3Client } from "@aws-sdk/client-s3";
+
 
 // Add OPTIONS handler for preflight requests
 export async function OPTIONS() {
@@ -22,22 +24,24 @@ async function listUserFiles(userId: string) {
   // Run diagnostics first
   await debugAwsCredentials();
   
-  const s3 = new S3Client(getS3Config());
-  
   // Debug credentials to verify they're properly resolved
-  try {
-    const creds = await s3.config.credentials!();
-    console.log("Resolved S3 credentials:", {
-      accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
-      secretAccessKey: creds.secretAccessKey ? "***" : undefined,
-      sessionToken: creds.sessionToken ? "Present" : "None",
-    });
-  } catch (error) {
-    console.error("Failed to resolve credentials:", error);
-  }
-  const BUCKET = process.env.S3_BUCKET_NAME!;
+  // try {
+  //   const creds = await s3Client.config.credentials!();
+  //   console.log("Resolved S3 credentials:", {
+  //     accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
+  //     secretAccessKey: creds.secretAccessKey ? "***" : undefined,
+  //     sessionToken: creds.sessionToken ? "Present" : "None",
+  //   });
+  // } catch (error) {
+  //   console.error("Failed to resolve credentials:", error);
+  // }
+  const s3 = new S3Client({
+    region: process.env.MYAPP_AWS_REGION || 'us-east-2',
+  });
+  console.log("S3 client created");
+  const bucketName = process.env.S3_BUCKET_NAME || "code-canvas-recordings";
   const command = new ListObjectsV2Command({
-    Bucket: BUCKET,
+    Bucket: bucketName,
     Prefix: `${userId}/`,
     MaxKeys: 100
   });

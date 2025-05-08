@@ -1,10 +1,10 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, PutObjectCommand, HeadBucketCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, HeadBucketCommand, GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { supabase } from "@/lib/supabase";
 import { log } from "console";
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { getS3Config, debugAwsCredentials } from "@/lib/s3";
+import { createS3Client, debugAwsCredentials, verifyS3Access } from "@/lib/s3";
 
 // Add OPTIONS handler for preflight requests
 export async function OPTIONS() {
@@ -21,22 +21,13 @@ export async function OPTIONS() {
 }
 
 const presignDownload = async (key: string) => {
-  const s3 = new S3Client(getS3Config());
+  // Create a new S3 client using default credential provider chain
+  const s3 = createS3Client();
+  console.log("S3 client created for download");
   
-  // Debug credentials
-  try {
-    const creds = await s3.config.credentials!();
-    console.log("Download - Resolved S3 credentials:", {
-      accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
-      secretAccessKey: creds.secretAccessKey ? "***" : undefined,
-      sessionToken: creds.sessionToken ? "Present" : "None",
-    });
-  } catch (error) {
-    console.error("Failed to resolve credentials for download:", error);
-  }
-  const BUCKET = process.env.S3_BUCKET_NAME!;
+  const bucketName = process.env.S3_BUCKET_NAME || "code-canvas-recordings";
   const command = new GetObjectCommand({
-    Bucket: BUCKET,
+    Bucket: bucketName,
     Key: key,
   });
 
@@ -48,22 +39,13 @@ const presignDownload = async (key: string) => {
 }
 
 const presignUpload = async (key: string, contentType = 'video/webm') => {
-  const s3 = new S3Client(getS3Config());
+  // Create a new S3 client using default credential provider chain
+  const s3 = createS3Client();
+  console.log("S3 client created for upload");
   
-  // Debug credentials
-  try {
-    const creds = await s3.config.credentials!();
-    console.log("Upload - Resolved S3 credentials:", {
-      accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
-      secretAccessKey: creds.secretAccessKey ? "***" : undefined,
-      sessionToken: creds.sessionToken ? "Present" : "None",
-    });
-  } catch (error) {
-    console.error("Failed to resolve credentials for upload:", error);
-  }
-  const BUCKET = process.env.S3_BUCKET_NAME!;
+  const bucketName = process.env.S3_BUCKET_NAME || "code-canvas-recordings";
   const command = new PutObjectCommand({
-    Bucket: BUCKET,
+    Bucket: bucketName,
     Key: key,
     ContentType: contentType,
   });
@@ -73,49 +55,6 @@ const presignUpload = async (key: string, contentType = 'video/webm') => {
   });
 
   return signedUrl;
-}
-
-async function verifyS3Access() {
-  try {
-    // Run diagnostic check first
-    await debugAwsCredentials();
-    
-    // Initialize the S3 client with appropriate credentials
-    const s3 = new S3Client(getS3Config());
-    
-    // Debug credentials to verify they're properly resolved
-    try {
-      const creds = await s3.config.credentials!();
-      console.log("Verify - Resolved S3 credentials:", {
-        accessKeyId: creds.accessKeyId ? creds.accessKeyId.substring(0, 4) + "..." : undefined,
-        secretAccessKey: creds.secretAccessKey ? "***" : undefined,
-        sessionToken: creds.sessionToken ? "Present" : "None",
-      });
-    } catch (error) {
-      console.error("Failed to resolve credentials for verification:", error);
-      return false;
-    }
-    
-    // Check if bucket exists
-    const bucketName = "code-canvas-recordings";
-    console.log(`Verifying bucket '${bucketName}' exists and is accessible...`);
-    
-    const headBucketCommand = new HeadBucketCommand({ Bucket: bucketName });
-    
-    try {
-      await s3.send(headBucketCommand);
-      console.log(`SUCCESS: Bucket '${bucketName}' exists and is accessible.`);
-      return true;
-    } catch (bucketError: any) {
-      console.error(`ERROR: Cannot access bucket '${bucketName}':`);
-      console.error(`   Status: ${bucketError.name} (${bucketError.$metadata?.httpStatusCode})`);
-      console.error(`   Message: ${bucketError.message}`);
-      return false;
-    }
-  } catch (e: any) {
-    console.error(" ERROR: Failed to initialize S3 client:", e.message);
-    return false;
-  }
 }
 
 // Verify S3 access when the module is loaded

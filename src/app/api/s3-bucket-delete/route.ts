@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { verifyS3Access, getS3Config, debugAwsCredentials } from "@/lib/s3";
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { verifyS3Access, debugAwsCredentials, createS3Client } from "@/lib/s3";
 
 // Add OPTIONS handler for preflight requests
 export async function OPTIONS() {
@@ -64,13 +64,14 @@ export async function DELETE(request: NextRequest) {
       // Note: Add additional permission checks here if needed
     }
     
-    // Initialize S3 client with proper credentials
-    const s3 = new S3Client(getS3Config());
+    // Create a new S3 client using default credential provider chain
+    const s3 = createS3Client();
+    console.log("S3 client created");
     
     console.log("Proceeding with deletion for key:", key);
-    const BUCKET = process.env.S3_BUCKET_NAME!;
+    const bucketName = process.env.S3_BUCKET_NAME || "code-canvas-recordings";
     const command = new DeleteObjectCommand({
-      Bucket: BUCKET,
+      Bucket: bucketName,
       Key: key,
     });
     
