@@ -39,6 +39,48 @@ const PatchNotes = () => {
 
 					<div className='mb-10'>
 						<h2 className='text-2xl font-bold mb-4 text-blue-600'>
+							Code Canvas 1.2{" "}
+							<span className='text-sm text-gray-500 font-normal'>(May 8, 2025)</span>
+						</h2>
+						<div className='border-l-4 border-blue-500 pl-4 mb-6'>
+							<h3 className='font-bold text-lg mb-2'>New Features:</h3>
+							<ul className='list-disc ml-6 space-y-2'>
+								<li>
+									Interview Recording: Users can now record their interview sessions
+									including code changes and video interactions
+								</li>
+								<li>
+									Playback Controls: Review and analyze past interviews with timestamp
+									markers for key moments
+								</li>
+								<li>
+									Recording Management: Organize, save, and share interview recordings
+									with team members
+								</li>
+							</ul>
+						</div>
+
+						<div className='border-l-4 border-green-500 pl-4 mb-6'>
+							<h3 className='font-bold text-lg mb-2'>Improvements:</h3>
+							<ul className='list-disc ml-6 space-y-2'>
+								<li>Optimized storage compression for interview recordings</li>
+								<li>Enhanced privacy controls for sharing recordings</li>
+								<li>Added keyboard shortcuts for recording controls</li>
+							</ul>
+						</div>
+
+						<div className='border-l-4 border-red-500 pl-4 mb-6'>
+							<h3 className='font-bold text-lg mb-2'>Bug Fixes:</h3>
+							<ul className='list-disc ml-6 space-y-2'>
+								<li>Fixed notification handling during active recordings</li>
+								<li>Resolved audio sync issues in extended recording sessions</li>
+								<li>Addressed browser compatibility issues with recording features</li>
+							</ul>
+						</div>
+					</div>
+
+					<div className='mb-10'>
+						<h2 className='text-2xl font-bold mb-4 text-blue-600'>
 							Code Canvas 1.1{" "}
 							<span className='text-sm text-gray-500 font-normal'>
 								(April 27, 2025)
@@ -48,7 +90,7 @@ const PatchNotes = () => {
 							<h3 className='font-bold text-lg mb-2'>New Features:</h3>
 							<ul className='list-disc ml-6 space-y-2'>
 								<li>User can now start video calls during coding interviews</li>
-								<li>New Whiteboard by tldraw</li>								
+								<li>New Whiteboard by tldraw</li>
 								<li>Improved UI/UX design with responsive layouts</li>
 							</ul>
 						</div>
