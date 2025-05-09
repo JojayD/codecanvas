@@ -68,7 +68,7 @@ export default function Home() {
 				<Header />
 			</div>
 			{/* Hero Section */}
-			<div className='container mx-auto px-4 py-16 md:py-24'>
+			<div className='container mx-auto px-4 py-24 md:py-32 min-h-screen'>
 				<div className='flex flex-col md:flex-row items-center justify-center gap-8'>
 					<div className='md:w-1/2 mb-10 md:mb-0'>
 						<h1 className='text-4xl md:text-5xl font-bold text-blue-900 mb-4'>
@@ -170,12 +170,12 @@ greet()`}
 				</div>
 			</div>
 			{/* Features Section */}
-			<div className='bg-white py-16'>
+			<div className='bg-white py-16 min-h-screen'>
 				<div className='container mx-auto px-4'>
 					<h2 className='text-3xl font-bold text-center text-blue-900 mb-12'>
 						Why Choose Code Canvas?
 					</h2>
-					<div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
+					<div className='flex flex-wrap justify-center gap-8'>
 						{[
 							{
 								title: "Real-Time Collaboration",
@@ -192,10 +192,20 @@ greet()`}
 								description:
 									"Run interviews or practice sessions seamlessly from any device, anywhere.",
 							},
+							{
+								title: "All in one platform",
+								description:
+									"Equipped with an integrated whiteboard, real-time camera, and a powerful code editor for seamless collaboration.",
+							},
+							{
+								title: "Record your sessions",
+								description:
+									"Capture and review your coding sessions with our recording feature.",
+							},
 						].map((feature, index) => (
 							<div
 								key={index}
-								className='bg-blue-50 p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow'
+								className='bg-blue-50 p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow w-full md:w-1/2 lg:w-1/3 tilt'
 							>
 								<h3 className='text-xl font-semibold text-blue-800 mb-3'>
 									{feature.title}
@@ -210,7 +220,7 @@ greet()`}
 			{/* Call to Action */}
 			<div className='py-16 bg-gradient-to-r from-blue-600 to-indigo-700 text-white mt-auto'>
 				<div className='container mx-auto px-4 text-center '>
-					<h2 className='text-3xl font-bold mb-6'>Ready to start coding?</h2>
+					<h2 className='text-3xl font-bold mb-6'>Your journey starts here</h2>
 					<p className='text-xl mb-8 max-w-2xl mx-auto'>
 						Join Code Canvas to practice coding with your friends and teammates.
 					</p>

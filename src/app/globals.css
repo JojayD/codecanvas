@@ -281,3 +281,11 @@ body {
 	opacity: 0.3;
 	cursor: default;
 }
+
+.tilt {
+	transition: transform 0.3s ease;
+}
+
+.tilt:hover {
+	transform: rotate(10deg); /* Adjust the degree of rotation as needed */
+}
