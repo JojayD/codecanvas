@@ -164,8 +164,9 @@ export default function Dashboard() {
 									<div className='p-3'>
 										<div className='font-medium'>v1.2 - May 8, 2025</div>
 										<ul className='mt-1 text-sm text-gray-700 ml-4 list-disc space-y-1'>
-											<li>Interview Recording: Record code sessions and interactions</li>
-											<li>Recording Management and download options</li>
+											<li>Enhanced Video Chat with screen sharing</li>
+											<li>Improved UI with better navigation and accessibility</li>
+											<li>Interview Recording and Playback features</li>
 										</ul>
 									</div>
 									<div className='p-3'>

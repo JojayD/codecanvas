@@ -46,3 +46,10 @@ next-env.d.ts
 amplify_outputs*
 amplifyconfiguration*
 aws-exports.js
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

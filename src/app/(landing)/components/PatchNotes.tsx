@@ -46,35 +46,36 @@ const PatchNotes = () => {
 							<h3 className='font-bold text-lg mb-2'>New Features:</h3>
 							<ul className='list-disc ml-6 space-y-2'>
 								<li>
-									Interview Recording: Users can now record their interview sessions
-									including code changes and video interactions
+									Enhanced Video Chat: Real-time video communication with screen sharing
+									capabilities
 								</li>
 								<li>
-									Playback Controls: Review and analyze past interviews with timestamp
-									markers for key moments
+									Collaborative Coding Sessions: Multiple users can edit code
+									simultaneously
 								</li>
-								<li>
-									Recording Management: Organize, save, and share interview recordings
-									with team members
-								</li>
+								<li>Code Playback: Review coding sessions with timestamp markers</li>
 							</ul>
 						</div>
 
 						<div className='border-l-4 border-green-500 pl-4 mb-6'>
 							<h3 className='font-bold text-lg mb-2'>Improvements:</h3>
 							<ul className='list-disc ml-6 space-y-2'>
-								<li>Optimized storage compression for interview recordings</li>
-								<li>Enhanced privacy controls for sharing recordings</li>
-								<li>Added keyboard shortcuts for recording controls</li>
+								<li>
+									Redesigned UI with intuitive navigation and improved accessibility
+								</li>
+								<li>Optimized UX with smoother transitions and reduced latency</li>
+								<li>Enhanced dark mode with customizable color themes</li>
+								<li>Improved mobile responsiveness for on-the-go collaboration</li>
 							</ul>
 						</div>
 
 						<div className='border-l-4 border-red-500 pl-4 mb-6'>
 							<h3 className='font-bold text-lg mb-2'>Bug Fixes:</h3>
 							<ul className='list-disc ml-6 space-y-2'>
-								<li>Fixed notification handling during active recordings</li>
-								<li>Resolved audio sync issues in extended recording sessions</li>
-								<li>Addressed browser compatibility issues with recording features</li>
+								<li>Fixed authentication token expiration handling</li>
+								<li>Resolved connectivity issues during extended sessions</li>
+								<li>Fixed memory leaks in video processing components</li>
+								<li>Addressed browser compatibility issues with WebRTC</li>
 							</ul>
 						</div>
 					</div>
