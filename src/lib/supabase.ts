@@ -17,6 +17,12 @@ export interface Room {
 	roomStatus?: boolean;
 }
 
+export interface Profile {
+	id: string;
+	last_login_date: string;
+	current_streak: number;
+}
+
 export interface LivekitRoom {
 	id?: number;
 	room_id: number;

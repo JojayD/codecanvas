@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { checkAndRefreshAuth } from "@/app/utils/supabase/client";
 import { Session } from "@supabase/supabase-js";
 
-// Define the Authentication context shape
+// Define the Authent	ication context shape
 interface AuthContextType {
 	session: Session | null;
 	loading: boolean;
