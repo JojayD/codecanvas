@@ -38,36 +38,33 @@ export default function Dashboard() {
 
 	const calculateStreak = () => {
 		if (!last_login_date) {
-			console.log("No last login date found");
-			return { current: 1, longest: 1 };
+			setCurrentStreak(1);
+			setLongestStreak(Math.max(1, longest_streak));
+			return;
 		}
 
-		// Compare dates, not timestamps
 		const lastLoginDay = new Date(last_login_date);
 		lastLoginDay.setHours(0, 0, 0, 0);
-		
+
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
-		console.log("Last login day:", lastLoginDay);
-		console.log("Today:", today);
+
 		const diffInDays = Math.floor(
 			(today.getTime() - lastLoginDay.getTime()) / (1000 * 60 * 60 * 24)
 		);
-		console.log("Diff in days:", diffInDays);
+
+		let newCurrentStreak = current_streak;
+
 		if (diffInDays > 1) {
-			setCurrentStreak(1);
-		} else {
-			if (today.getDate() !== lastLoginDay.getDate()) {
-				setCurrentStreak(current_streak + 1);
-				setLongestStreak(longest_streak + 1);
-			}else{
-				setCurrentStreak(current_streak);
-				setLongestStreak(longest_streak);
-			}
+			newCurrentStreak = 1;
+		} else if (diffInDays === 1) {
+			newCurrentStreak = current_streak + 1;
 		}
 
-		if (current_streak > longest_streak) {
-			setLongestStreak(current_streak);
+		setCurrentStreak(newCurrentStreak);
+
+		if (newCurrentStreak > longest_streak) {
+			setLongestStreak(newCurrentStreak);
 		}
 	};
 

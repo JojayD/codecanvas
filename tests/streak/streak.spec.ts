@@ -11,7 +11,14 @@ test.describe('calculateStreak()', () => {
     expect(result?.current).toBe(1);
     expect(result?.longest).toBe(7);
   });
-
+  test('adds 1 to current streak when last login was yesterday', () => {
+    const yesterday = new Date(
+      Date.now() - 1 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const result = calculateStreak(yesterday, 2, 4);
+    expect(result?.current).toBe(3);
+  });
+  
   test('increments both current and longest when last login was yesterday', () => {
     const yesterday = new Date(
       Date.now() - 1 * 24 * 60 * 60 * 1000
