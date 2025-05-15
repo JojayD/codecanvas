@@ -32,6 +32,9 @@
 
 - **Authentication**  
   Secure login using Email & OTP, Google OAuth, or GitHub OAuth.
+  
+- **Realtime Camera**  
+  Users can use camera to create more of a simulation of realtime interviews.
 
 - **Persistent Rooms**  
   Users can create or join rooms with unique, shareable IDs for continued collaboration.
