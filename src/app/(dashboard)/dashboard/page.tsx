@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,18 @@ import { getUserId } from "@/app/utils/supabase/lib/supabaseGetUserId";
 import Image from "next/image";
 import { CiCamera } from "react-icons/ci";
 import { AiFillAudio } from "react-icons/ai";
+import { useDashboard } from "@/app/context/DashboardContextProvider";
 import Link from "next/link";
 export default function Dashboard() {
+	const {
+		id,
+		last_login_date,
+		current_streak,
+		longest_streak,
+		setLastLoginDate,
+		setCurrentStreak,
+		setLongestStreak,
+	} = useDashboard();
 	const router = useRouter();
 	const [roomIdInput, setRoomIdInput] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -26,14 +36,72 @@ export default function Dashboard() {
 		setUserName(e.target.value);
 	};
 
+	const calculateStreak = () => {
+		if (!last_login_date) {
+			setCurrentStreak(1);
+			setLongestStreak(Math.max(1, longest_streak));
+			return;
+		}
+
+		const lastLoginDay = new Date(last_login_date);
+		lastLoginDay.setHours(0, 0, 0, 0);
+
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+
+		const diffInDays = Math.floor(
+			(today.getTime() - lastLoginDay.getTime()) / (1000 * 60 * 60 * 24)
+		);
+
+		let newCurrentStreak = current_streak;
+
+		if (diffInDays > 1) {
+			newCurrentStreak = 1;
+		} else if (diffInDays === 1) {
+			newCurrentStreak = current_streak + 1;
+		}
+
+		setCurrentStreak(newCurrentStreak);
+
+		if (newCurrentStreak > longest_streak) {
+			setLongestStreak(newCurrentStreak);
+		}
+	};
+
+	const updateStreak = () => {
+		if (id) {
+			calculateStreak();
+		} else {
+			console.log("No ID found");
+		}
+	};
 	/**
 	 * UseEfect to check permission status
 	 */
 
 	useEffect(() => {
-		console.log("enableAudio changed:", enableAudio);
-		console.log("enableCamera changed:", enableCamera);
-	}, [enableAudio, enableCamera]);
+		async function updateStreakUser() {
+			if (id) {
+				updateStreak();
+				const { error } = await supabase
+					.from("profiles")
+					.update({
+						last_login_date: new Date().toISOString(),
+						current_streak: current_streak,
+						longest_streak: longest_streak,
+					})
+					.eq("id", id);
+				if (error) {
+					console.error("Error updating streak:", error);
+				} else {
+					console.log("Streak updated successfully");
+				}
+			} else {
+				console.log("No ID found");
+			}
+		}
+		updateStreakUser();
+	}, [id, current_streak, longest_streak, last_login_date]); // Only depend on ID, not the function itself
 
 	const createNewRoom = async () => {
 		try {
@@ -127,7 +195,7 @@ export default function Dashboard() {
 				<div className='max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 flex justify-between items-center'>
 					{" "}
 					{/* Reduced padding */}
-					<div>
+					<div className='flex items-center'>
 						<Image
 							src='/codecanvastransparent.png'
 							alt='Code Canvas'
@@ -135,6 +203,14 @@ export default function Dashboard() {
 							height={60} // Keep this for aspect ratio, but adjust CSS for dynamic height
 							className='w-auto h-16' // Dynamic height
 						/>
+
+						{/* Streak indicator */}
+						<div className='ml-4 bg-blue-700 px-3 py-1 rounded-lg flex flex-row'>
+							<div className='text-xl font-bold text-white flex items-center'>
+								{current_streak} day{current_streak !== 1 ? "s" : ""}
+								<span className='text-yellow-300 ml-1'>🔥</span>
+							</div>
+						</div>
 					</div>
 					<div>
 						<Button

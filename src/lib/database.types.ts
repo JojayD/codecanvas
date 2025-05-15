@@ -38,6 +38,27 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          current_streak: number | null
+          id: string
+          last_login_date: string
+          longest_streak: number | null
+        }
+        Insert: {
+          current_streak?: number | null
+          id: string
+          last_login_date: string
+          longest_streak?: number | null
+        }
+        Update: {
+          current_streak?: number | null
+          id?: string
+          last_login_date?: string
+          longest_streak?: number | null
+        }
+        Relationships: []
+      }
       rooms: {
         Row: {
           code: string | null
