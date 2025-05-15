@@ -24,7 +24,7 @@ function ClientOnly({ children }: { children: React.ReactNode }) {
 	}, []);
 
 	if (!hasMounted) {
-		return null; 
+		return null;
 	}
 
 	return <>{children}</>;
@@ -35,8 +35,6 @@ export function DashboardContextProvider({
 }: {
 	children: React.ReactNode;
 }) {
-	
-	
 	const [lastLoginDate, setLastLoginDate] = useState<string | null>(null);
 	const [currentStreak, setCurrentStreak] = useState<number>(1);
 	const [longestStreak, setLongestStreak] = useState<number>(1);
@@ -46,7 +44,9 @@ export function DashboardContextProvider({
 		const fetchUserData = async () => {
 			const userId = await getUserId();
 			setUserId(userId);
-			if (!userId) return;
+			if (!userId) {
+				return;
+			}
 
 			try {
 				const { data, error } = await supabase
@@ -54,26 +54,32 @@ export function DashboardContextProvider({
 					.select("last_login_date, current_streak, longest_streak")
 					.eq("id", userId)
 					.single();
-				
-				if (error){
-					const { data, error } = await supabase.from("profiles").insert({
-						id: userId,
-						last_login_date: new Date().toISOString(),
-						current_streak: 1,
-						longest_streak: 1,
-					});
-					if (error) throw error;
-				};
 
-				console.log("Data:", data?.last_login_date);
-				if (data) {
-					setLastLoginDate(data.last_login_date);
+				if (error) {
+					console.log("Error fetching user profile in DashboardContextProvider:", error);
+					const { data: newData, error: insertError } = await supabase
+						.from("profiles")
+						.insert({
+							id: userId,
+							last_login_date: new Date().toISOString(),
+							current_streak: 1,
+							longest_streak: 1,
+						});
+
+					if (insertError) {
+						throw insertError;
+					}
+
+					// Set initial values for a new user
+					setLastLoginDate(new Date().toISOString());
+					setCurrentStreak(1);
+					setLongestStreak(1);
+				} else if (data) {
+					setLastLoginDate(data.last_login_date || new Date().toISOString());
 					setCurrentStreak(data.current_streak || 1);
 					setLongestStreak(data.longest_streak || 1);
-					console.log("Last login date:", data.last_login_date);
 				}
 			} catch (err) {
-				console.error("Error fetching user data:", err);
 			}
 		};
 

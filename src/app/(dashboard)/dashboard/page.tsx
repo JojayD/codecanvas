@@ -27,22 +27,36 @@ export default function Dashboard() {
 	const router = useRouter();
 	const [roomIdInput, setRoomIdInput] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState("");
 	const [userName, setUserName] = useState("");
 	const [enableAudio, setEnableAudio] = useState(true);
 	const [enableCamera, setEnableCamera] = useState(true);
 	const [showUpdates, setShowUpdates] = useState(false);
 	const updatesDropdownRef = useRef<HTMLDivElement>(null);
-	const hasUpdatedStreak = useRef(false);
+	const hasUpdatedStreak = useRef<boolean>(false);
+	const hasUpdatedStreakToday = useRef<boolean>(false);
 	const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setUserName(e.target.value);
 	};
 
 	const calculateStreak = () => {
+		console.log("CALCULATE STREAK STARTED");
+		console.log("Initial values:", {
+			last_login_date,
+			current_streak,
+			longest_streak,
+			hasUpdated: hasUpdatedStreak.current,
+		});
+
 		if (!last_login_date) {
+			console.log("Setting streak to 1");
 			setCurrentStreak(1);
 			setLongestStreak(Math.max(1, longest_streak));
-			return;
+			return {
+				newCurrentStreak: 1,
+				newLongestStreak: Math.max(1, longest_streak),
+			};
 		}
 
 		const lastLoginDay = new Date(last_login_date);
@@ -51,8 +65,15 @@ export default function Dashboard() {
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
 
+		// Get date strings for easier debugging
+		const lastLoginStr = lastLoginDay.toLocaleDateString();
+		const todayStr = today.toLocaleDateString();
+
 		const diffInDays = Math.floor(
 			(today.getTime() - lastLoginDay.getTime()) / (1000 * 60 * 60 * 24)
+		);
+		console.log(
+			`Diff in days: ${diffInDays}, Last login: ${lastLoginStr}, Today: ${todayStr}`
 		);
 
 		let newCurrentStreak = current_streak;
@@ -61,20 +82,34 @@ export default function Dashboard() {
 			newCurrentStreak = 1;
 		} else if (diffInDays === 1) {
 			newCurrentStreak = current_streak + 1;
+		} else if (diffInDays === 0) {
+			console.log(
+				"ℹ️ Same day login, maintaining current streak:",
+				current_streak
+			);
+		} else {
+			console.log(diffInDays);
 		}
 
+		console.log("Updating streak from", current_streak, "to", newCurrentStreak);
 		setCurrentStreak(newCurrentStreak);
 
+		let newLongestStreak = longest_streak;
 		if (newCurrentStreak > longest_streak) {
+			console.log("New longest streak achieved:", newCurrentStreak);
+			newLongestStreak = newCurrentStreak;
 			setLongestStreak(newCurrentStreak);
 		}
+
+		return { newCurrentStreak, newLongestStreak };
 	};
 
 	const updateStreak = () => {
 		if (id) {
-			calculateStreak();
+			return calculateStreak();
 		} else {
 			console.log("No ID found");
+			return null;
 		}
 	};
 	/**
@@ -82,29 +117,125 @@ export default function Dashboard() {
 	 */
 
 	useEffect(() => {
+		const lastStreakUpdate = localStorage.getItem("lastStreakUpdate");
+		const today = new Date().toDateString();
+
+		if (lastStreakUpdate === today) {
+			hasUpdatedStreak.current = true; // Set the ref to true if already updated today
+			console.log("Already updated streak today, skipping update");
+		} else {
+			hasUpdatedStreak.current = false; // Reset the ref if it's a new day
+		}
+	}, []);
+
+	useEffect(() => {
+		if (id !== null && last_login_date !== null) {
+			console.log("All data loaded, ready to calculate streak");
+			setIsLoading(false);
+		}
+	}, [id, last_login_date]);
+
+	useEffect(() => {
+		// use localstorage to determine if we update it or not !!
+		const lastStreakUpdate = localStorage.getItem("lastStreakUpdate");
+		const today = new Date().toDateString();
+
+		if (lastStreakUpdate === today) {
+			hasUpdatedStreakToday.current = true;
+			console.log("Already updated streak today, skipping update");
+		} else {
+			hasUpdatedStreakToday.current = false;
+		}
+	}, []);
+
+	useEffect(() => {
 		async function updateStreakUser() {
-			if (id && !hasUpdatedStreak.current) {
+			if (
+				id &&
+				!isLoading &&
+				!hasUpdatedStreak.current &&
+				!hasUpdatedStreakToday.current
+			) {
+				console.log("Conditions met for streak update");
 				hasUpdatedStreak.current = true;
-				updateStreak();
+
+				// Update streak calculation and get new values
+				const streakResult = updateStreak();
+				if (!streakResult) return;
+
+				const { newCurrentStreak, newLongestStreak } = streakResult;
+
+				// Determine if we need to update the last_login_date
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+
+				let shouldUpdateLoginDate = false;
+
+				if (last_login_date) {
+					const lastLoginDay = new Date(last_login_date);
+					lastLoginDay.setHours(0, 0, 0, 0);
+					const diffInDays = Math.floor(
+						(today.getTime() - lastLoginDay.getTime()) / (1000 * 60 * 60 * 24)
+					);
+
+					// Only update last_login_date if it's a different day
+					shouldUpdateLoginDate = diffInDays > 0;
+					console.log(
+						"Should update login date?",
+						shouldUpdateLoginDate,
+						"diffInDays:",
+						diffInDays
+					);
+				} else {
+					// If no last_login_date, we should update it
+					shouldUpdateLoginDate = true;
+				}
+
 				const { error } = await supabase
 					.from("profiles")
 					.update({
-						last_login_date: new Date().toISOString(),
-						current_streak: current_streak,
-						longest_streak: longest_streak,
+						// Only update last_login_date if needed
+						...(shouldUpdateLoginDate
+							? { last_login_date: new Date().toISOString() }
+							: {}),
+						current_streak: newCurrentStreak, // Use the new calculated value
+						longest_streak: newLongestStreak, // Use the new calculated value
 					})
 					.eq("id", id);
+
 				if (error) {
 					console.error("Error updating streak:", error);
 				} else {
-					console.log("Streak updated successfully");
+					// Mark that we've updated the streak today
+					localStorage.setItem("lastStreakUpdate", new Date().toDateString());
+					hasUpdatedStreakToday.current = true;
+					console.log(
+						"Streak updated successfully in database, won't update again today"
+					);
 				}
 			} else {
-				console.log("No ID found or streak already updated");
+				console.log("No streak update needed:", {
+					id,
+					hasUpdated: hasUpdatedStreak.current,
+					isLoading,
+					hasUpdatedToday: hasUpdatedStreakToday.current,
+				});
 			}
 		}
+
 		updateStreakUser();
-	}, [id]); // Only depend on ID changing, not the streak values
+
+		// Keep your cleanup function
+		return () => {
+			console.log("Resetting hasUpdatedStreak on cleanup");
+			hasUpdatedStreak.current = false;
+		};
+	}, [id, isLoading, last_login_date, hasUpdatedStreakToday]);
+
+	const resetStreakUpdateFlag = () => {
+		hasUpdatedStreak.current = false;
+		calculateStreak();
+	};
 
 	const createNewRoom = async () => {
 		try {
@@ -209,10 +340,36 @@ export default function Dashboard() {
 
 						{/* Streak indicator */}
 						<div className='ml-4 bg-blue-700 px-3 py-1 rounded-lg flex flex-row preserve-blue'>
-							<div className='text-xl font-bold text-white flex items-center'>
-								{current_streak} day{current_streak !== 1 ? "s" : ""}
-								<span className='text-yellow-300 ml-1'>🔥</span>
-							</div>
+							{isLoading ? (
+								<div className='text-xl font-bold text-white flex items-center'>
+									<svg
+										className='animate-spin h-5 w-5 mr-2'
+										xmlns='http://www.w3.org/2000/svg'
+										fill='none'
+										viewBox='0 0 24 24'
+									>
+										<circle
+											className='opacity-25'
+											cx='12'
+											cy='12'
+											r='10'
+											stroke='currentColor'
+											strokeWidth='4'
+										></circle>
+										<path
+											className='opacity-75'
+											fill='currentColor'
+											d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+										></path>
+									</svg>
+									Loading...
+								</div>
+							) : (
+								<div className='text-xl font-bold text-white flex items-center'>
+									{current_streak} day{current_streak !== 1 ? "s" : ""}
+									<span className='text-yellow-300 ml-1'>🔥</span>
+								</div>
+							)}
 						</div>
 					</div>
 					<div className='flex items-center gap-1.5'>
@@ -473,50 +630,6 @@ export default function Dashboard() {
 									Audio and video are muted when you first join the room, but you can
 									enable or adjust them at any time during the call.
 								</h1>
-								{/* <div className='flex space-x-4 mb-2 gap-4'>
-									<div className='flex items-center space-x-2'>
-										<input
-											type='checkbox'
-											id='enableAudio'
-											onChange={(e) => setEnableAudio(e.target.checked)}
-											className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
-										/>
-										<Label
-											htmlFor='enableAudio'
-											className='flex items-center'
-										>
-											<AiFillAudio className='text-gray-600 text-xl mr-1' />
-											<span>Enable Audio</span>
-										</Label>
-									</div>
-									<div className='flex items-center space-x-2'>
-										<input
-											type='checkbox'
-											id='enableCamera'
-											onChange={(e) => setEnableCamera(e.target.checked)}
-											className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
-										/>
-										<Label
-											htmlFor='enableCamera'
-											className='flex items-center'
-										>
-											<CiCamera className='text-gray-600 text-xl mr-1' />
-											<span>Enable Camera</span>
-										</Label>
-									</div>
-								</div>
-								<p className='text-xs text-gray-500 italic'>
-									You can change these settings after joining the room.
-								</p>
-								<button
-									className='border-4'
-									onClick={() => {
-										console.log("Hello");
-										handlegoToTestVideoRoom();
-									}}
-								>
-									camera room test
-								</button> */}
 							</div>
 							{/**End of media options */}
 						</div>
