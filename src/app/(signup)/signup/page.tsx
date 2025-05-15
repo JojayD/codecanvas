@@ -100,9 +100,9 @@ export default function SignUpPage() {
 			</div>
 
 			{/* Right Panel */}
-			<div className='w-1/2 flex items-center justify-center p-12 bg-white'>
+			<div className='w-1/2 flex items-center justify-center p-12 dark:bg-gray-900 light:bg-white'>
 				<div className='w-full max-w-md space-y-6'>
-					<h1 className='text-2xl font-semibold text-gray-800 text-center'>
+					<h1 className='text-2xl font-semibold dark:text-gray-100 text-center'>
 						Sign Up with Email
 					</h1>
 					{error && <div className='text-red-600 text-center'>{error}</div>}
@@ -123,13 +123,13 @@ export default function SignUpPage() {
 								type='email'
 								placeholder='Email'
 								required
-								className='w-full px-4 py-2 border rounded-lg focus:ring focus:outline-none'
+								className='w-full px-4 py-2 border rounded-lg focus:ring focus:outline-none dark:bg-gray-800 dark:text-gray-100'
 								value={email}
 								onChange={(e) => setEmail(e.target.value)}
 								disabled={loading}
 							/>
 						</div>
-						<p className='text-sm text-gray-600 mb-4'>
+						<p className='text-sm text-gray-600 mb-4 dark:text-gray-300'>
 							We'll send you a magic link to sign up. No password needed!
 						</p>
 						<button
@@ -156,7 +156,7 @@ export default function SignUpPage() {
 						</div>
 					</div>
 
-					<p className='text-center text-gray-600'>
+					<p className='text-center text-gray-600 dark:text-gray-300'>
 						Already have an account?{" "}
 						<a
 							href='/login'

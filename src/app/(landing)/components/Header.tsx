@@ -3,10 +3,11 @@
 import Link from "next/link";
 import React, { useState } from "react";
 import Hamburger from "hamburger-react";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 const Header = () => {
 	const [isOpen, setOpen] = useState(false);
 	return (
-		<div className='sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-400 shadow-lg'>
+		<div className='sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-400 dark:from-indigo-800 dark:via-blue-700 dark:to-cyan-600 shadow-lg'>
 			<div className='max-w-7xl mx-auto'>
 				<div className='flex justify-between items-center h-16'>
 					{/* Logo Section with Animation */}
@@ -43,10 +44,11 @@ const Header = () => {
 							</Link>
 							<Link
 								href='/signup'
-								className='text-white hover:text-cyan-100 bg-blue-700 hover:bg-blue-800 px-4 py-2 text-sm font-medium rounded-md transition duration-300'
+								className='text-white hover:text-cyan-100 bg-blue-700 hover:bg-blue-800 dark:bg-blue-800 dark:hover:bg-blue-900 px-4 py-2 text-sm font-medium rounded-md transition duration-300'
 							>
 								Sign Up
 							</Link>
+							<ThemeToggle />
 						</div>
 					</div>
 
@@ -58,7 +60,7 @@ const Header = () => {
 							toggle={setOpen}
 						/>
 						{isOpen && (
-							<div className='absolute top-16 right-0 w-48 bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-400 p-4 rounded-lg shadow-lg flex flex-col space-y-2'>
+							<div className='absolute top-16 right-0 w-48 bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-400 dark:from-indigo-800 dark:via-blue-700 dark:to-cyan-600 p-4 rounded-lg shadow-lg flex flex-col space-y-2'>
 								<Link
 									href='/'
 									className='text-white px-3 py-2 rounded-md text-base font-medium'
@@ -83,6 +85,9 @@ const Header = () => {
 								>
 									Sign Up
 								</Link>
+								<div className='px-3 py-2'>
+									<ThemeToggle />
+								</div>
 							</div>
 						)}
 					</div>

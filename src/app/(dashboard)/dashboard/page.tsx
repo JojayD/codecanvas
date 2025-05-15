@@ -13,6 +13,7 @@ import { CiCamera } from "react-icons/ci";
 import { AiFillAudio } from "react-icons/ai";
 import { useDashboard } from "@/app/context/DashboardContextProvider";
 import Link from "next/link";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 export default function Dashboard() {
 	const {
 		id,
@@ -32,6 +33,7 @@ export default function Dashboard() {
 	const [enableCamera, setEnableCamera] = useState(true);
 	const [showUpdates, setShowUpdates] = useState(false);
 	const updatesDropdownRef = useRef<HTMLDivElement>(null);
+	const hasUpdatedStreak = useRef(false);
 	const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setUserName(e.target.value);
 	};
@@ -81,7 +83,8 @@ export default function Dashboard() {
 
 	useEffect(() => {
 		async function updateStreakUser() {
-			if (id) {
+			if (id && !hasUpdatedStreak.current) {
+				hasUpdatedStreak.current = true;
 				updateStreak();
 				const { error } = await supabase
 					.from("profiles")
@@ -97,11 +100,11 @@ export default function Dashboard() {
 					console.log("Streak updated successfully");
 				}
 			} else {
-				console.log("No ID found");
+				console.log("No ID found or streak already updated");
 			}
 		}
 		updateStreakUser();
-	}, [id, current_streak, longest_streak, last_login_date]); // Only depend on ID, not the function itself
+	}, [id]); // Only depend on ID changing, not the streak values
 
 	const createNewRoom = async () => {
 		try {
@@ -205,24 +208,25 @@ export default function Dashboard() {
 						/>
 
 						{/* Streak indicator */}
-						<div className='ml-4 bg-blue-700 px-3 py-1 rounded-lg flex flex-row'>
+						<div className='ml-4 bg-blue-700 px-3 py-1 rounded-lg flex flex-row preserve-blue'>
 							<div className='text-xl font-bold text-white flex items-center'>
 								{current_streak} day{current_streak !== 1 ? "s" : ""}
 								<span className='text-yellow-300 ml-1'>🔥</span>
 							</div>
 						</div>
 					</div>
-					<div>
+					<div className='flex items-center gap-1.5'>
+						<ThemeToggle />
 						<Button
 							variant='outline'
-							className='bg-orange-500 text-white hover:bg-orange-700 mr-2'
+							className='bg-orange-500 text-white hover:bg-orange-700 mr-2 preserve-orange'
 						>
 							<Link href='/recordings'>Recordings</Link>
 						</Button>
 						<Button
 							onClick={() => setShowUpdates(!showUpdates)}
 							variant='outline'
-							className='bg-green-500 text-white hover:bg-green-700 mr-2'
+							className='bg-green-500 text-white hover:bg-green-700 mr-2 preserve-green'
 						>
 							Updates ✨
 						</Button>
@@ -268,7 +272,7 @@ export default function Dashboard() {
 						<Button
 							onClick={handleLogout}
 							variant='outline'
-							className='bg-red-600 text-white'
+							className='bg-red-600 text-white preserve-red'
 						>
 							Logout
 						</Button>
@@ -276,7 +280,7 @@ export default function Dashboard() {
 				</div>
 			</header>
 
-			<main className='flex-grow flex items-center justify-center p-8'>
+			<main className='flex-grow flex items-center justify-center p-8 dark:bg-gray-700'>
 				<div className='bg-white rounded-2xl shadow-xl overflow-hidden max-w-4xl w-full grid md:grid-cols-2 gap-0'>
 					{/* Left panel with illustration/graphics */}
 					<div className='bg-gradient-to-br from-blue-600 to-indigo-700 p-8 flex flex-col justify-center items-center text-white'>
@@ -289,10 +293,10 @@ export default function Dashboard() {
 								className='w-auto h-46' // Dynamic height
 							/>
 						</div>
-						<h2 className='text-3xl font-bold mb-4 text-center'>
+						<h2 className='text-3xl font-bold mb-4 text-center dark:text-gray-100'>
 							Collaborative Coding
 						</h2>
-						<p className='text-center text-blue-100 mb-6'>
+						<p className='text-center text-blue-100 mb-6 dark:text-gray-100'>
 							Create or join a room to start coding with your team in real-time.
 						</p>
 						<div className='space-y-3 text-sm'>
@@ -310,7 +314,7 @@ export default function Dashboard() {
 										d='M5 13l4 4L19 7'
 									/>
 								</svg>
-								<span>Real-time code collaboration</span>
+								<span className='dark:text-gray-100'>Real-time code collaboration</span>
 							</div>
 							<div className='flex items-center'>
 								<svg
@@ -348,8 +352,8 @@ export default function Dashboard() {
 					</div>
 
 					{/* Right panel with forms */}
-					<div className='p-8'>
-						<h2 className='text-2xl font-bold mb-6 text-gray-800 md:text-left text-center'>
+					<div className='p-8 dark:bg-gray-800'>
+						<h2 className='text-2xl font-bold mb-6 text-gray-800 md:text-left text-center dark:text-gray-100'>
 							Welcome Back
 						</h2>
 
@@ -370,7 +374,7 @@ export default function Dashboard() {
 										</svg>
 									</div>
 									<div className='ml-3'>
-										<p className='text-sm'>{error}</p>
+										<p className='text-sm dark:text-gray-100'>{error}</p>
 									</div>
 								</div>
 							</div>
@@ -380,7 +384,7 @@ export default function Dashboard() {
 							<div>
 								<Label
 									htmlFor='username'
-									className='text-gray-700 font-medium block mb-2'
+									className='text-gray-700 dark:text-gray-100 font-medium block mb-2'
 								>
 									Your Username
 								</Label>
@@ -389,7 +393,7 @@ export default function Dashboard() {
 									placeholder='Enter your username'
 									value={userName}
 									onChange={handleUserNameChange}
-									className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+									className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100'
 								/>
 							</div>
 
@@ -434,14 +438,16 @@ export default function Dashboard() {
 									<span className='w-full border-t border-gray-300'></span>
 								</div>
 								<div className='relative flex justify-center text-xs uppercase'>
-									<span className='bg-white px-2 text-gray-500'>Or</span>
+									<span className='bg-white dark:bg-gray-800 px-2 text-gray-500'>
+										Or
+									</span>
 								</div>
 							</div>
 
 							<div>
 								<Label
 									htmlFor='roomId'
-									className='text-gray-700 font-medium block mb-2'
+									className='text-gray-700 font-medium block mb-2 dark:text-gray-100'
 								>
 									Join Existing Room
 								</Label>
@@ -451,11 +457,11 @@ export default function Dashboard() {
 										placeholder='Enter room ID'
 										value={roomIdInput}
 										onChange={(e) => setRoomIdInput(e.target.value)}
-										className='flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+										className='flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100'
 									/>
 									<Button
 										onClick={joinExistingRoom}
-										className='px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium'
+										className='px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium dark:bg-indigo-700 dark:hover:bg-indigo-800'
 									>
 										Join
 									</Button>
@@ -463,7 +469,7 @@ export default function Dashboard() {
 							</div>
 							{/* Media options section */}
 							<div className='flex flex-col gap-3'>
-								<h1 className='text-gray-700 font-medium mb-2'>
+								<h1 className='text-gray-700 dark:text-gray-100 font-medium mb-2'>
 									Audio and video are muted when you first join the room, but you can
 									enable or adjust them at any time during the call.
 								</h1>
@@ -520,7 +526,7 @@ export default function Dashboard() {
 
 			<footer className='bg-blue-600 py-4 shadow-inner'>
 				<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-					<p className='text-center text-white text-sm'>
+					<p className='text-center text-white dark:text-gray-100 text-sm'>
 						© {new Date().getFullYear()} Code Canvas. All rights reserved.
 					</p>
 				</div>
