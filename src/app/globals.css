@@ -98,6 +98,12 @@ body {
 	--magenta: #db2777; /* Magenta - analogous to purple */
 }
 
+.light {
+	--background: oklch(0.985 0 0);
+	--foreground: oklch(0.145 0 0);
+}
+
+
 .dark {
 	--background: oklch(0.145 0 0);
 	--foreground: oklch(0.985 0 0);
@@ -130,6 +136,22 @@ body {
 	--sidebar-accent-foreground: oklch(0.985 0 0);
 	--sidebar-border: oklch(1 0 0 / 10%);
 	--sidebar-ring: oklch(0.556 0 0);
+}
+
+.dark .preserve-blue {
+	background-color: #2563eb !important; /* blue-600 */
+}
+
+.dark .preserve-orange {
+	background-color: #f97316 !important; /* orange-500 */
+}
+
+.dark .preserve-green {
+	background-color: #22c55e !important; /* green-500 */
+}
+
+.dark .preserve-red {
+	background-color: #dc2626 !important; /* red-600 */
 }
 
 @layer base {
@@ -288,4 +310,26 @@ body {
 
 .tilt:hover {
 	transform: rotate(10deg); /* Adjust the degree of rotation as needed */
+}
+
+.preserve-colors {
+	color: inherit !important;
+	background-color: inherit !important;
+}
+
+/* Preserve specific colors */
+.dark .preserve-blue {
+	background-color: #2563eb !important; /* blue-600 */
+}
+
+.dark .preserve-orange {
+	background-color: #f97316 !important; /* orange-500 */
+}
+
+.dark .preserve-green {
+	background-color: #22c55e !important; /* green-500 */
+}
+
+.dark .preserve-red {
+	background-color: #dc2626 !important; /* red-600 */
 }

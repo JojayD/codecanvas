@@ -59,7 +59,8 @@
     "recordrtc": "^5.6.2",
     "tailwind-merge": "^3.0.2",
     "tailwindcss-animate": "^1.0.7",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.14.3",

@@ -109,17 +109,17 @@ export default function LoginPage() {
 			</div>
 
 			{/* Right Panel */}
-			<div className='w-1/2 flex items-center justify-center p-12 bg-white'>
+			<div className='w-1/2 flex items-center justify-center p-12 dark:bg-gray-900 light:bg-white'>
 				<div className='absolute top-0 left-0 p-4'></div>
 				<div className='w-full max-w-md space-y-6'>
-					<h1 className='text-2xl font-semibold text-gray-800 text-center'>
+					<h1 className='text-2xl font-semibold text-gray-800 text-center dark:text-gray-100'>
 						Welcome
 					</h1>
 					{error && <div className='text-red-600 text-center'>{error}</div>}
 
 					<form
 						onSubmit={handleSignUp}
-						className='space-y-4'
+						className='space-y-4 dark:text-gray-100'
 					>
 						<div>
 							<label
@@ -139,7 +139,7 @@ export default function LoginPage() {
 								disabled={loading}
 							/>
 						</div>
-						<p className='text-sm text-gray-600 mb-4 text-center'>
+						<p className='text-sm text-gray-600 mb-4 text-center dark:text-gray-300'>
 							We'll send you a magic link to sign up. No password needed!
 						</p>
 
@@ -167,7 +167,7 @@ export default function LoginPage() {
 						</div>
 					</div>
 
-					<p className='text-center text-gray-600'>
+					<p className='text-center dark:text-gray-300 light:text-gray-600'>
 						Don't have an account?{" "}
 						<a
 							href='/signup'
