@@ -247,16 +247,6 @@ function Canvas() {
 		// Check every 10 seconds as a fallback
 
 		// Add beforeunload event listener to handle unexpected exits
-		const handleBeforeUnload = () => {
-			console.log("Browser closing/refreshing - leaving room");
-			// Use synchronous fetch via navigator.sendBeacon to handle the cleanup
-			if (roomId && currentUser?.userId) {
-				const url = `/api/leave-room?roomId=${roomId}&userId=${currentUser.userId}&checkForHostExit=false`;
-				navigator.sendBeacon(url);
-			}
-		};
-
-		window.addEventListener("beforeunload", handleBeforeUnload);
 
 		// Leave the room when component unmounts
 		return () => {
@@ -269,8 +259,7 @@ function Canvas() {
 			}
 
 			console.log("Canvas component unmounting - cleaning up");
-			window.removeEventListener("beforeunload", handleBeforeUnload);
-
+			
 			// Clear the status check interval
 		};
 	}, [
